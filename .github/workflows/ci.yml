@@ -23,19 +23,23 @@ jobs:
       - name: Resolve Swift Packages
         run: swift package resolve
 
-      # 移除 OS=latest，讓系統自動對準已安裝的 iPhone 15 模擬器環境
+      # 動態抓取系統中第一個可用的 iOS 模擬器，不再被硬碼名稱綁死
       - name: Run Core Logic Tests (iOS)
         run: |
+          DEST=$(xcodebuild -workspace . -scheme CryptoStream-TCA -showdestinations | grep -m 1 "platform:iOS Simulator" | sed -E 's/.*platform:([^,]+), id:([^,]+), name:([^,]+).*/platform=\1,id=\2/')
+          echo "Selected Destination: $DEST"
           xcodebuild test \
             -workspace . \
             -scheme CryptoStream-TCA \
-            -destination "platform=iOS Simulator,name=iPhone 15"
+            -destination "$DEST"
 
-      # 同理，編譯步驟也放寬限制
+      # 針對相同的動態目標進行 App 編譯驗證
       - name: Build iOS App (Xcodeproj)
         run: |
+          DEST=$(xcodebuild -workspace . -scheme CryptoApp -showdestinations | grep -m 1 "platform:iOS Simulator" | sed -E 's/.*platform:([^,]+), id:([^,]+), name:([^,]+).*/platform=\1,id=\2/')
+          echo "Selected Destination: $DEST"
           xcodebuild build \
             -project CryptoApp.xcodeproj \
             -scheme CryptoApp \
-            -destination "platform=iOS Simulator,name=iPhone 15" \
+            -destination "$DEST" \
             -clonedSourcePackagesDirPath $HOME/Library/Developer/Xcode/DerivedData/CryptoApp/SourcePackages
