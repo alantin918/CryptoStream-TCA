@@ -9,37 +9,33 @@ on:
 jobs:
   test-and-build:
     name: Test and Build
-    runs-on: macos-latest
+    runs-on: macos-14 # 鎖定 macOS 14 環境，這與 Xcode 16.1 搭配最穩定
     
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      # 使用 16.1 並鎖定 iOS 18.1 環境，這是目前雲端最穩健的組合
       - name: Select Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: '16.2'
+          xcode-version: '16.1'
 
       - name: Resolve Swift Packages
         run: swift package resolve
 
-      # 動態抓取系統中第一個可用的 iOS 模擬器，不再被硬碼名稱綁死
+      # 使用明確存在的 iPhone 16 (iOS 18.1) 模擬器跑測試
       - name: Run Core Logic Tests (iOS)
         run: |
-          DEST=$(xcodebuild -workspace . -scheme CryptoStream-TCA -showdestinations | grep -m 1 "platform:iOS Simulator" | sed -E 's/.*platform:([^,]+), id:([^,]+), name:([^,]+).*/platform=\1,id=\2/')
-          echo "Selected Destination: $DEST"
           xcodebuild test \
             -workspace . \
             -scheme CryptoStream-TCA \
-            -destination "$DEST"
+            -destination "platform=iOS Simulator,name=iPhone 16,OS=18.1"
 
-      # 針對相同的動態目標進行 App 編譯驗證
       - name: Build iOS App (Xcodeproj)
         run: |
-          DEST=$(xcodebuild -workspace . -scheme CryptoApp -showdestinations | grep -m 1 "platform:iOS Simulator" | sed -E 's/.*platform:([^,]+), id:([^,]+), name:([^,]+).*/platform=\1,id=\2/')
-          echo "Selected Destination: $DEST"
           xcodebuild build \
             -project CryptoApp.xcodeproj \
             -scheme CryptoApp \
-            -destination "$DEST" \
+            -destination "platform=iOS Simulator,name=iPhone 16,OS=18.1" \
             -clonedSourcePackagesDirPath $HOME/Library/Developer/Xcode/DerivedData/CryptoApp/SourcePackages
