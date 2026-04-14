@@ -9,7 +9,7 @@ on:
 jobs:
   test-and-build:
     name: Test and Build
-    runs-on: macos-14
+    runs-on: macos-latest
     
     steps:
       - name: Checkout Code
@@ -18,21 +18,21 @@ jobs:
       - name: Select Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: '16.1'
+          xcode-version: '16.2' # 使用最穩定的 16.2
 
       - name: Resolve Swift Packages
         run: swift package resolve
 
-      # 加入 -skipMacroValidation 來放行 TCA 使用的巨集
+      # 加入 -parallelizeTargets NO 降低記憶體壓力，防止編譯器崩潰
       - name: Run Core Logic Tests (iOS)
         run: |
           xcodebuild test \
             -workspace . \
             -scheme CryptoStream-TCA \
             -destination "platform=iOS Simulator,name=iPhone 16,OS=18.1" \
-            -skipMacroValidation
+            -skipMacroValidation \
+            -parallelizeTargets NO
 
-      # 同樣在編譯步驟加上 -skipMacroValidation
       - name: Build iOS App (Xcodeproj)
         run: |
           xcodebuild build \
@@ -40,4 +40,5 @@ jobs:
             -scheme CryptoApp \
             -destination "platform=iOS Simulator,name=iPhone 16,OS=18.1" \
             -skipMacroValidation \
+            -parallelizeTargets NO \
             -clonedSourcePackagesDirPath $HOME/Library/Developer/Xcode/DerivedData/CryptoApp/SourcePackages
