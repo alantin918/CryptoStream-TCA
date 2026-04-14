@@ -9,32 +9,24 @@ on:
 jobs:
   test-and-build:
     name: Test and Build
-    # 關鍵修正 1：換成最新的 macOS 15，預設配備最新 Swift 系統
     runs-on: macos-15
     
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 關鍵修正 2：用最底層的終端指令完全強制切換到 Xcode 16.2
+      # 強制切換到 Xcode 16.2 確保獲得 Swift 6 編譯環境
       - name: Force Select Xcode 16.2
-        run: |
-          sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
-          swift --version
+        run: sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
 
       - name: Resolve Swift Packages
         run: swift package resolve
 
-      # 在 macOS 上跑單元測試（最穩定，不依賴特定 iOS 模擬器版本）
+      # 【關鍵更改】用最純正、最原生的 Swift Test 代替笨重的 Xcodebuild
       - name: Run Unit Tests (macOS)
-        run: |
-          xcodebuild test \
-            -workspace . \
-            -scheme CryptoStream-TCA \
-            -destination "platform=macOS" \
-            -skipMacroValidation
+        run: swift test
 
-      # 驗證 App 殼專案能針對通用的 iOS Simulator 編譯
+      # App 這裡繼續保持使用 iOS 通用模擬器，確保 UIKit 等 iOS 專屬部分能過
       - name: Build iOS App
         run: |
           xcodebuild build \
