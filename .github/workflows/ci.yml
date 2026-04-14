@@ -18,12 +18,12 @@ jobs:
       - name: Select Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: '16.2' # 使用最穩定的 16.2
+          xcode-version: '16.2'
 
       - name: Resolve Swift Packages
         run: swift package resolve
 
-      # 加入 -parallelizeTargets NO 降低記憶體壓力，防止編譯器崩潰
+      # 修正語法：使用 -maximum-concurrent-build-operations 來限制併發數
       - name: Run Core Logic Tests (iOS)
         run: |
           xcodebuild test \
@@ -31,7 +31,7 @@ jobs:
             -scheme CryptoStream-TCA \
             -destination "platform=iOS Simulator,name=iPhone 16,OS=18.1" \
             -skipMacroValidation \
-            -parallelizeTargets NO
+            -maximum-concurrent-build-operations 2
 
       - name: Build iOS App (Xcodeproj)
         run: |
@@ -40,5 +40,5 @@ jobs:
             -scheme CryptoApp \
             -destination "platform=iOS Simulator,name=iPhone 16,OS=18.1" \
             -skipMacroValidation \
-            -parallelizeTargets NO \
+            -maximum-concurrent-build-operations 2 \
             -clonedSourcePackagesDirPath $HOME/Library/Developer/Xcode/DerivedData/CryptoApp/SourcePackages
