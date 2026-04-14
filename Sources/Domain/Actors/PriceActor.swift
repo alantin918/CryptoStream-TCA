@@ -8,7 +8,7 @@ public actor PriceActor {
     private var lastProcessedTimestamp: Int64 = -1
     
     // State for Throttling
-    private var lastEmittedTime: ContinuousClock.Instant = .now
+    private var lastEmittedTime: ContinuousClock.Instant
     
     private let clock: ContinuousClock
     private let minInterval: Duration
@@ -19,6 +19,8 @@ public actor PriceActor {
         self.clock = clock
         // 10 Hz = 100 milliseconds
         self.minInterval = .milliseconds(1000 / updatesPerSecond)
+        // 初始化為很久以前，確保第一筆資料永遠能通過節流，不會被誤丟棄
+        self.lastEmittedTime = clock.now.advanced(by: .seconds(-3600))
     }
     
     /// Processes a single tick, returning the tick if it passes throttling and ordering rules.

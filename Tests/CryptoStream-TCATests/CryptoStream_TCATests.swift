@@ -8,10 +8,10 @@ final class CryptoReducerTests: XCTestCase {
     // MARK: - 1. 測試價格紅綠色邏輯 (Price Delta Validation)
     
     func testReceivePriceDeltaColoring() async {
-        let store = TestStore(
-            initialState: CryptoReducer.State(),
-            reducer: CryptoReducer()
-        )
+        // 使用 block-based 初始化，解決 TCA 1.17.0 的型別推斷問題
+        let store = TestStore(initialState: CryptoReducer.State()) {
+            CryptoReducer()
+        }
         
         // 第 1 筆價格：預設顏色
         let firstPrice = CryptoPrice(symbol: "BTCUSDT", price: 50000.0, timestamp: 1000)
@@ -39,19 +39,20 @@ final class CryptoReducerTests: XCTestCase {
     
     func testConnectionLifecycle() async {
         // 利用 Swift 內建的 AsyncStream 來模擬虛擬的假 Socket 連線
-        var continuation: AsyncThrowingStream<URLSessionWebSocketTask.Message, Error>.Continuation!
+        // nonisolated(unsafe) 是 Swift 6 中允許在並發環境捕獲可變變數的標準做法
+        nonisolated(unsafe) var continuation: AsyncThrowingStream<URLSessionWebSocketTask.Message, Error>.Continuation!
         let mockStream = AsyncThrowingStream<URLSessionWebSocketTask.Message, Error> { cont in
             continuation = cont
         }
         
-        let store = TestStore(
-            initialState: CryptoReducer.State(),
-            reducer: CryptoReducer()
-        )
-        
-        // 替換掉底層依賴，不再真的對外連線，而是攔截它！
-        store.dependencies.webSocketClient.connect = { _ in return mockStream }
-        store.dependencies.webSocketClient.disconnect = { continuation.finish() }
+        // 使用 withDependencies 閉包注入假依賴，這是 TCA 1.17.0 最穩定的寫法
+        let store = TestStore(initialState: CryptoReducer.State()) {
+            CryptoReducer()
+        } withDependencies: {
+            // 注意：明確標注參數型別 (_ url: URL) 解決 Swift 6 推斷問題
+            $0.webSocketClient.connect = { (_: URL) in mockStream }
+            $0.webSocketClient.disconnect = { continuation.finish() }
+        }
         
         // 【動作】畫面出現：狀態應變成 connecting，然後 effect .run 裡發送 connected
         let task = await store.send(.onAppear) {
@@ -108,6 +109,9 @@ final class PriceActorTests: XCTestCase {
         // 塞入過去的時間戳 -> 被 Actor 中的機制精準攔截拋棄
         result = await actor.process(next: tickOutdated)
         XCTAssertNil(result, "Timestamp 歷史封包必須被自動拋棄，不能干擾 UI")
+        
+        // 等待超過節流間隔 (1000Hz = 1ms)，確保下一筆資料不會被節流擋下
+        try? await Task.sleep(for: .milliseconds(5))
         
         // 較新的封包正常過關
         result = await actor.process(next: tick2)
