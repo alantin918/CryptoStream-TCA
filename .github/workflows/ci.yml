@@ -23,7 +23,7 @@ jobs:
       - name: Resolve Swift Packages
         run: swift package resolve
 
-      # 用必定存在的 macOS 主機來跑單元測試，絕對不會發生找不到模擬器的問題！
+      # 在 macOS 上跑單元測試（最穩定，不依賴特定 iOS 模擬器版本）
       - name: Run Unit Tests (macOS)
         run: |
           xcodebuild test \
@@ -32,7 +32,7 @@ jobs:
             -destination "platform=macOS" \
             -skipMacroValidation
 
-      # 使用通用的 "generic/platform=iOS Simulator" 確保無論哪台電腦都能編譯 App
+      # 驗證 App 殼專案能針對通用的 iOS Simulator 編譯
       - name: Build iOS App
         run: |
           xcodebuild build \
