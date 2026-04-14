@@ -13,133 +13,153 @@ public struct CryptoView: View {
             ZStack {
                 // 1. Sleek Dark Gradient Background
                 LinearGradient(
-                    gradient: Gradient(colors: [Color(red: 0.05, green: 0.05, blue: 0.15), Color.black]),
+                    gradient: Gradient(colors: [Color(red: 0.05, green: 0.05, blue: 0.1), Color.black]),
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
                 .ignoresSafeArea()
                 
+                // Animated ambient light blobs for "Premium" look
+                ZStack {
+                    Circle()
+                        .fill(Color.blue.opacity(0.15))
+                        .frame(width: 300, height: 300)
+                        .blur(radius: 100)
+                        .offset(x: -150, y: -200)
+                    
+                    Circle()
+                        .fill(Color.purple.opacity(0.15))
+                        .frame(width: 300, height: 300)
+                        .blur(radius: 100)
+                        .offset(x: 150, y: 200)
+                }
+                
                 VStack(spacing: 0) {
-                    // Top Bar (Status Indicator)
-                    HStack {
-                        Spacer()
-                        HeaderStatusIndicator(status: viewStore.connectivityStatus)
-                    }
-                    .padding(.horizontal, 24)
-                    .padding(.top, 16)
+                    // Header Area
+                    HeaderView(status: viewStore.connectivityStatus)
                     
-                    Spacer()
-                    
-                    if let price = viewStore.currentPrice {
-                        // Main Price Card
-                        PriceCardView(
-                            price: price,
-                            color: viewStore.priceColor
-                        )
-                        .transition(.scale(scale: 0.95).combined(with: .opacity))
-                    } else {
-                        // Loading State Screen
-                        VStack(spacing: 24) {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                .scaleEffect(1.5)
-                            
-                            Text("CONNECTING TO BINANCE...")
-                                .font(.caption)
-                                .fontWeight(.bold)
-                                .kerning(2)
-                                .foregroundColor(.white.opacity(0.6))
+                    ScrollView(showsIndicators: false) {
+                        LazyVStack(spacing: 20) {
+                            ForEach(viewStore.coins) { coin in
+                                CoinCardView(coin: coin)
+                                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                            }
                         }
+                        .padding(.horizontal, 20)
+                        .padding(.top, 10)
+                        .padding(.bottom, 30)
                     }
-                    
-                    Spacer()
-                    Spacer() // Slightly visually lifts the main content
                 }
             }
             .preferredColorScheme(.dark)
-            // Bind Lifecycle -> Reducer Actions
             .onAppear { viewStore.send(.onAppear) }
             .onDisappear { viewStore.send(.onDisappear) }
         }
     }
 }
 
-// MARK: - Glassmorphism UI Card
+// MARK: - Header Component
 
-private struct PriceCardView: View {
-    let price: CryptoPrice
-    let color: Color
+private struct HeaderView: View {
+    let status: CryptoReducer.ConnectivityStatus
     
-    // State for local micro-animations
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Crypto Dashboard")
+                    .font(.system(size: 28, weight: .black, design: .rounded))
+                    .foregroundColor(.white)
+                
+                Text("Real-time Binance Feed")
+                    .font(.caption)
+                    .fontWeight(.bold)
+                    .foregroundColor(.white.opacity(0.5))
+                    .kerning(1)
+            }
+            
+            Spacer()
+            
+            HeaderStatusIndicator(status: status)
+        }
+        .padding(.horizontal, 24)
+        .padding(.top, 20)
+        .padding(.bottom, 16)
+    }
+}
+
+// MARK: - Individual Coin Card
+
+private struct CoinCardView: View {
+    let coin: CryptoReducer.CoinState
+    
     @State private var isPulsing = false
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 28) {
-            
-            // Header: Symbol & Animated Status Dot
+        VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Image(systemName: "bitcoinsign.circle.fill")
-                    .resizable()
-                    .frame(width: 36, height: 36)
-                    .foregroundColor(.orange)
-                    .shadow(color: .orange.opacity(0.5), radius: 8, x: 0, y: 0)
-                
-                HStack(alignment: .lastTextBaseline, spacing: 2) {
-                    Text("BTC")
-                        .font(.title2)
-                        .fontWeight(.black)
-                        .foregroundColor(.white)
+                // Symbol Info
+                HStack(spacing: 12) {
+                    SymbolIcon(symbol: coin.id)
                     
-                    Text("/USDT")
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.white.opacity(0.5))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(coin.symbolDisplayName)
+                            .font(.headline)
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                        
+                        Text("Binance")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(.white.opacity(0.4))
+                    }
                 }
                 
                 Spacer()
                 
-                // Color trend indicator shadow dot
-                Circle()
-                    .fill(color)
-                    .frame(width: 10, height: 10)
-                    .shadow(color: color.opacity(0.8), radius: isPulsing ? 12 : 2)
+                // Indicators
+                if coin.currentPrice != nil {
+                    CapsuleIndicator(color: coin.priceColor)
+                }
             }
             
-            // Body: Animated Price Data
-            VStack(alignment: .leading, spacing: 8) {
-                Text(price.price, format: .currency(code: "USD").presentation(.narrow))
-                    .font(.system(size: 52, weight: .black, design: .rounded))
-                    .foregroundColor(.white)
-                    .minimumScaleFactor(0.4)
-                    .lineLimit(1)
-                    // The pulse shadow flashes intensely upon data update
-                    .shadow(color: color.opacity(isPulsing ? 0.6 : 0), radius: isPulsing ? 16 : 0)
-                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: price.price)
+            HStack(alignment: .bottom) {
+                // Price Display
+                VStack(alignment: .leading, spacing: 4) {
+                    if let price = coin.currentPrice {
+                        Text(price, format: .currency(code: "USD").presentation(.narrow))
+                            .font(.system(size: 32, weight: .black, design: .rounded))
+                            .foregroundColor(.white)
+                            .shadow(color: coin.priceColor.opacity(isPulsing ? 1.0 : 0), radius: 10)
+                            .animation(.spring(response: 0.2, dampingFraction: 0.6), value: price)
+                    } else {
+                        Text("---.---")
+                            .font(.system(size: 32, weight: .black, design: .rounded))
+                            .foregroundColor(.white.opacity(0.2))
+                    }
+                }
                 
-                Text("Last updated: \(timestampString(from: price.timestamp))")
-                    .font(.caption)
-                    .foregroundColor(.white.opacity(0.4))
+                Spacer()
+                
+                // Sparkline Placeholder (Visual aesthetics)
+                MiniSparkline(color: coin.priceColor)
+                    .frame(width: 80, height: 35)
             }
         }
-        .padding(32)
+        .padding(24)
         .background(
-            RoundedRectangle(cornerRadius: 32, style: .continuous)
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
                 .fill(.ultraThinMaterial)
-                // Ambient dynamic shadow projecting downward
-                .shadow(color: color.opacity(0.15), radius: 30, x: 0, y: 15)
+                .shadow(color: Color.black.opacity(0.3), radius: 20, x: 0, y: 10)
         )
-        // Premium outline stroke effect for glass edges
         .overlay(
-            RoundedRectangle(cornerRadius: 32, style: .continuous)
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
                 .stroke(LinearGradient(
-                    gradient: Gradient(colors: [.white.opacity(0.3), .white.opacity(0.05)]),
+                    gradient: Gradient(colors: [.white.opacity(0.2), .white.opacity(0.05)]),
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 ), lineWidth: 1)
         )
-        .padding(.horizontal, 24)
-        // Whenever the price changes, trigger our rapid micro-animation sequence
-        .onChange(of: price.price) { _ in
+        .scaleEffect(isPulsing ? 1.02 : 1.0)
+        .onChange(of: coin.currentPrice) { _ in
             triggerPulse()
         }
     }
@@ -148,27 +168,80 @@ private struct PriceCardView: View {
         withAnimation(.easeOut(duration: 0.1)) {
             isPulsing = true
         }
-        // Swiftly decay the flash
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            withAnimation(.easeIn(duration: 0.4)) {
+            withAnimation(.easeIn(duration: 0.3)) {
                 isPulsing = false
             }
         }
     }
+}
+
+// MARK: - Subcomponents
+
+private struct SymbolIcon: View {
+    let symbol: String
     
-    private func timestampString(from epochMs: Int64) -> String {
-        let date = Date(timeIntervalSince1970: TimeInterval(epochMs) / 1000.0)
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm:ss.SS"
-        return formatter.string(from: date)
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(themeColor.opacity(0.2))
+                .frame(width: 40, height: 40)
+            
+            Image(systemName: iconName)
+                .font(.system(size: 18, weight: .bold))
+                .foregroundColor(themeColor)
+                .shadow(color: themeColor.opacity(0.5), radius: 5)
+        }
+    }
+    
+    private var iconName: String {
+        switch symbol {
+        case "btcusdt": return "bitcoinsign.circle.fill"
+        case "ethusdt": return "diamond.fill"
+        case "solusdt": return "s.circle.fill"
+        case "bnbusdt": return "b.circle.fill"
+        default: return "chart.bar.fill"
+        }
+    }
+    
+    private var themeColor: Color {
+        switch symbol {
+        case "btcusdt": return .orange
+        case "ethusdt": return .blue
+        case "solusdt": return .purple
+        case "bnbusdt": return .yellow
+        default: return .gray
+        }
     }
 }
 
-// MARK: - Premium Status Pill Indicator
+private struct MiniSparkline: View {
+    let color: Color
+    
+    var body: some View {
+        // Aesthetic fake sparkline to give "Premium" feel
+        Path { path in
+            path.move(to: CGPoint(x: 0, y: 20))
+            path.addCurve(to: CGPoint(x: 80, y: 10),
+                         control1: CGPoint(x: 20, y: 0),
+                         control2: CGPoint(x: 60, y: 40))
+        }
+        .stroke(color.opacity(0.6), style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+    }
+}
+
+private struct CapsuleIndicator: View {
+    let color: Color
+    var body: some View {
+        Circle()
+            .fill(color)
+            .frame(width: 8, height: 8)
+            .shadow(color: color, radius: 4)
+    }
+}
 
 private struct HeaderStatusIndicator: View {
     let status: CryptoReducer.ConnectivityStatus
-    
     @State private var isBlinking = false
     
     var body: some View {
@@ -176,28 +249,19 @@ private struct HeaderStatusIndicator: View {
             Circle()
                 .fill(statusColor)
                 .frame(width: 8, height: 8)
-                .shadow(color: statusColor.opacity(0.8), radius: isBlinking ? 8 : 0)
-                // Infinity breathing scale & glow animation for connected state
                 .scaleEffect(isBlinking ? 1.2 : 0.8)
-                .animation(status == .connected ? .easeInOut(duration: 1.2).repeatForever(autoreverses: true) : .default, value: isBlinking)
+                .animation(status == .connected ? .easeInOut(duration: 1.0).repeatForever() : .default, value: isBlinking)
             
             Text(status.rawValue.uppercased())
-                .font(.system(size: 11, weight: .bold, design: .monospaced))
-                .foregroundColor(.white.opacity(0.7))
-                .animation(.none, value: status) // Prevent slide transitions on text
+                .font(.system(size: 10, weight: .black, design: .monospaced))
+                .foregroundColor(.white.opacity(0.6))
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(Capsule().fill(.ultraThinMaterial))
-        // Glass capsule stroke
-        .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 1))
-        .onChange(of: status) { newStatus in
-            if newStatus == .connected {
-                isBlinking = true
-            } else {
-                isBlinking = false
-            }
-        }
+        .background(Capsule().fill(.white.opacity(0.05)))
+        .overlay(Capsule().stroke(Color.white.opacity(0.1), lineWidth: 1))
+        .onAppear { if status == .connected { isBlinking = true } }
+        .onChange(of: status) { isBlinking = ($0 == .connected) }
     }
     
     private var statusColor: Color {
@@ -208,3 +272,4 @@ private struct HeaderStatusIndicator: View {
         }
     }
 }
+

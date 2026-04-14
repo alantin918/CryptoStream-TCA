@@ -5,18 +5,35 @@ import Foundation
 public typealias CryptoPrice = PriceTick
 
 public struct CryptoReducer: Reducer, Sendable {
-    public struct State: Equatable {
-        public var currentPrice: CryptoPrice?
+    public struct CoinState: Equatable, Identifiable {
+        public let id: String // Symbol
+        public var currentPrice: Double?
+        public var lastPrice: Double?
+        public var status: String = "Waiting..."
         public var priceColor: Color = .primary
+        public var lastUpdate: Date = .distantPast
+        
+        public var symbolDisplayName: String {
+            id.replacingOccurrences(of: "usdt", with: "").uppercased()
+        }
+    }
+    
+    public struct State: Equatable {
+        public var coins: IdentifiedArrayOf<CoinState> = []
         public var connectivityStatus: ConnectivityStatus = .disconnected
         
-        public init() {}
+        public init() {
+            let initialSymbols = ["btcusdt", "ethusdt", "solusdt", "bnbusdt", "dogeusdt"]
+            self.coins = IdentifiedArrayOf(
+                uniqueElements: initialSymbols.map { CoinState(id: $0) }
+            )
+        }
     }
     
     public enum Action: Equatable {
         case onAppear
         case onDisappear
-        case receivePrice(CryptoPrice)
+        case receivePrice(PriceTick)
         case updateStatus(ConnectivityStatus)
     }
     
@@ -27,6 +44,7 @@ public struct CryptoReducer: Reducer, Sendable {
     }
     
     @Dependency(\.webSocketClient) var webSocketClient
+    @Dependency(\.date) var date
     
     private enum CancelID { case webSocket }
     
@@ -36,15 +54,14 @@ public struct CryptoReducer: Reducer, Sendable {
         switch action {
         case .onAppear:
             state.connectivityStatus = .connecting
-            let url = URL(string: "wss://stream.binance.com:9443/ws/btcusdt@trade")!
-            // Capture dependency locally to avoid self capture in Sendable closure
+            
+            let symbols = state.coins.map { $0.id }
+            let streams = symbols.map { "\($0)@trade" }.joined(separator: "/")
+            let url = URL(string: "wss://stream.binance.com:9443/stream?streams=\(streams)")!
+            
             let client = webSocketClient
             
             return .run { send in
-                defer {
-                    print("CryptoReducer Lifecycle: .run effect terminated.")
-                }
-                
                 await send(.updateStatus(.connected))
                 let priceActor = PriceActor()
                 let stream = try await client.connect(url)
@@ -62,17 +79,18 @@ public struct CryptoReducer: Reducer, Sendable {
                     
                     guard let data = rawData else { continue }
                     
-                    if let trade = try? JSONDecoder().decode(BinanceTradeDTO.self, from: data),
-                       let priceDouble = Double(trade.price) {
-                        
-                        let tick = CryptoPrice(
-                            symbol: trade.symbol,
-                            price: priceDouble,
-                            timestamp: trade.eventTime
-                        )
-                        
-                        if let validTick = await priceActor.process(next: tick) {
-                            await send(.receivePrice(validTick))
+                    if let envelope = try? JSONDecoder().decode(BinanceEnvelopeDTO.self, from: data) {
+                        let trade = envelope.data
+                        if let priceDouble = Double(trade.price) {
+                            let tick = PriceTick(
+                                symbol: trade.symbol.lowercased(),
+                                price: priceDouble,
+                                timestamp: trade.eventTime
+                            )
+                            
+                            if let validTick = await priceActor.process(next: tick) {
+                                await send(.receivePrice(validTick))
+                            }
                         }
                     }
                 }
@@ -88,16 +106,23 @@ public struct CryptoReducer: Reducer, Sendable {
                 await client.disconnect()
             }
             .cancellable(id: CancelID.webSocket)
+
+        case let .receivePrice(tick):
+            guard var coin = state.coins[id: tick.symbol] else { return .none }
             
-        case let .receivePrice(newPrice):
-            if let oldPrice = state.currentPrice {
-                if newPrice.price > oldPrice.price {
-                    state.priceColor = .green
-                } else if newPrice.price < oldPrice.price {
-                    state.priceColor = .red
+            coin.lastPrice = coin.currentPrice
+            coin.currentPrice = tick.price
+            coin.lastUpdate = self.date.now
+            
+            if let last = coin.lastPrice {
+                if tick.price > last {
+                    coin.priceColor = .green
+                } else if tick.price < last {
+                    coin.priceColor = .red
                 }
             }
-            state.currentPrice = newPrice
+            
+            state.coins[id: tick.symbol] = coin
             return .none
             
         case let .updateStatus(status):
@@ -105,6 +130,13 @@ public struct CryptoReducer: Reducer, Sendable {
             return .none
         }
     }
+}
+
+// MARK: - DTOs
+
+private struct BinanceEnvelopeDTO: Decodable {
+    let stream: String
+    let data: BinanceTradeDTO
 }
 
 private struct BinanceTradeDTO: Decodable {
