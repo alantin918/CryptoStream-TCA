@@ -23,18 +23,19 @@ jobs:
       - name: Resolve Swift Packages
         run: swift package resolve
 
-      # 明確指定 -workspace . 讓 xcodebuild 能跨過 .xcodeproj 直接找到 Package 的 Scheme
+      # 移除 OS=latest，讓系統自動對準已安裝的 iPhone 15 模擬器環境
       - name: Run Core Logic Tests (iOS)
         run: |
           xcodebuild test \
             -workspace . \
             -scheme CryptoStream-TCA \
-            -destination 'platform=iOS Simulator,name=iPhone 15,OS=latest'
+            -destination "platform=iOS Simulator,name=iPhone 15"
 
+      # 同理，編譯步驟也放寬限制
       - name: Build iOS App (Xcodeproj)
         run: |
           xcodebuild build \
             -project CryptoApp.xcodeproj \
             -scheme CryptoApp \
-            -destination 'platform=iOS Simulator,name=iPhone 15,OS=latest' \
+            -destination "platform=iOS Simulator,name=iPhone 15" \
             -clonedSourcePackagesDirPath $HOME/Library/Developer/Xcode/DerivedData/CryptoApp/SourcePackages
