@@ -15,15 +15,21 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      # 切換到 Xcode 16.2
       - name: Force Select Xcode 16.2
         run: |
           sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
           swift --version
 
+      # 【致勝關鍵】花一兩分鐘現場下載 iOS 18.2 模擬器，補足 GitHub 缺少的拼圖！
+      - name: Download iOS Simulator
+        run: |
+          xcodebuild -downloadPlatform iOS
+
       - name: Resolve Swift Packages
         run: swift package resolve
 
-      # 【致勝關鍵】使用 iOS 模擬器執行單元測試，徹底避開 macOS 平台的語法解析 Bug！
+      # 在有 Simulator 的環境下，直接跑最初設定的 iOS 測試
       - name: Run Unit Tests (iOS Simulator)
         run: |
           xcodebuild test \
@@ -32,7 +38,7 @@ jobs:
             -destination "platform=iOS Simulator,name=iPhone 16" \
             -skipMacroValidation
 
-      # 驗證整體 App 的編譯 (沒有變動)
+      # 驗證整體 App 的編譯
       - name: Build iOS App
         run: |
           xcodebuild build \
