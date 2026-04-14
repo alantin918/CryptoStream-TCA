@@ -15,18 +15,24 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 強制切換到 Xcode 16.2 確保獲得 Swift 6 編譯環境
       - name: Force Select Xcode 16.2
-        run: sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
+        run: |
+          sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
+          swift --version
 
       - name: Resolve Swift Packages
         run: swift package resolve
 
-      # 【關鍵更改】用最純正、最原生的 Swift Test 代替笨重的 Xcodebuild
-      - name: Run Unit Tests (macOS)
-        run: swift test
+      # 【致勝關鍵】使用 iOS 模擬器執行單元測試，徹底避開 macOS 平台的語法解析 Bug！
+      - name: Run Unit Tests (iOS Simulator)
+        run: |
+          xcodebuild test \
+            -workspace . \
+            -scheme CryptoStream-TCA \
+            -destination "platform=iOS Simulator,name=iPhone 16" \
+            -skipMacroValidation
 
-      # App 這裡繼續保持使用 iOS 通用模擬器，確保 UIKit 等 iOS 專屬部分能過
+      # 驗證整體 App 的編譯 (沒有變動)
       - name: Build iOS App
         run: |
           xcodebuild build \
