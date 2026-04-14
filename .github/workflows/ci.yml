@@ -23,20 +23,20 @@ jobs:
       - name: Resolve Swift Packages
         run: swift package resolve
 
-      # 這裡會跑 Tests/CryptoStream-TCATests 底下的邏輯測試
-      - name: Run Unit Tests (iOS Simulator)
+      # 用必定存在的 macOS 主機來跑單元測試，絕對不會發生找不到模擬器的問題！
+      - name: Run Unit Tests (macOS)
         run: |
           xcodebuild test \
             -workspace . \
             -scheme CryptoStream-TCA \
-            -destination "platform=iOS Simulator,name=iPhone 16,OS=18.1" \
+            -destination "platform=macOS" \
             -skipMacroValidation
 
-      # 驗證整體 App 的編譯
+      # 使用通用的 "generic/platform=iOS Simulator" 確保無論哪台電腦都能編譯 App
       - name: Build iOS App
         run: |
           xcodebuild build \
             -project CryptoApp.xcodeproj \
             -scheme CryptoApp \
-            -destination "platform=iOS Simulator,name=iPhone 16,OS=18.1" \
+            -destination "generic/platform=iOS Simulator" \
             -skipMacroValidation
