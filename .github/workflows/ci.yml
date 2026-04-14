@@ -23,14 +23,9 @@ jobs:
       - name: Resolve Swift Packages
         run: swift package resolve
 
-      # 在 macOS 上跑單元測試（最穩定，不依賴特定 iOS 模擬器版本）
-      - name: Run Unit Tests (macOS)
-        run: |
-          xcodebuild test \
-            -workspace . \
-            -scheme CryptoStream-TCA \
-            -destination "platform=macOS" \
-            -skipMacroValidation
+      # 使用最直接的 swift test，完全避開 xcodebuild 的目標依賴解析問題
+      - name: Run Unit Tests
+        run: swift test -v
 
       # 驗證 App 殼專案能針對通用的 iOS Simulator 編譯
       - name: Build iOS App
