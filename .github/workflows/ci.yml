@@ -15,11 +15,11 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 這裡改用 setup-xcode 方案，最穩定
+      # 使用目前的 macos-latest 環境中存在的 Xcode 16.0
       - name: Select Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: '15.4'
+          xcode-version: '16.0'
 
       - name: Resolve Swift Packages
         run: swift package resolve
@@ -32,5 +32,5 @@ jobs:
           xcodebuild build \
             -project CryptoApp.xcodeproj \
             -scheme CryptoApp \
-            -destination 'platform=iOS Simulator,name=iPhone 15,OS=latest' \
+            -destination 'platform=iOS Simulator,name=iPhone 15' \
             -clonedSourcePackagesDirPath $HOME/Library/Developer/Xcode/DerivedData/CryptoApp/SourcePackages
