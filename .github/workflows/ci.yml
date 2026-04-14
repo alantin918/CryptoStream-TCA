@@ -23,16 +23,18 @@ jobs:
       - name: Resolve Swift Packages
         run: swift package resolve
 
-      # 使用 --triple 直攻 iOS 模擬器環境進行測試，避開 xcodebuild scheme 衝突
+      # 明確指定 -workspace . 讓 xcodebuild 能跨過 .xcodeproj 直接找到 Package 的 Scheme
       - name: Run Core Logic Tests (iOS)
         run: |
-          swift test -v --triple arm64-apple-ios17.0-simulator
+          xcodebuild test \
+            -workspace . \
+            -scheme CryptoStream-TCA \
+            -destination 'platform=iOS Simulator,name=iPhone 15,OS=latest'
 
-      # 驗證 App 殼專案編譯
       - name: Build iOS App (Xcodeproj)
         run: |
           xcodebuild build \
             -project CryptoApp.xcodeproj \
             -scheme CryptoApp \
-            -destination 'platform=iOS Simulator,name=iPhone 15' \
+            -destination 'platform=iOS Simulator,name=iPhone 15,OS=latest' \
             -clonedSourcePackagesDirPath $HOME/Library/Developer/Xcode/DerivedData/CryptoApp/SourcePackages
