@@ -8,7 +8,7 @@ on:
 
 jobs:
   test-and-build:
-    name: Build and Validate
+    name: Test and Build
     runs-on: macos-latest
     
     steps:
@@ -23,11 +23,16 @@ jobs:
       - name: Resolve Swift Packages
         run: swift package resolve
 
-      # 直接驗證 Package 的程式碼能夠編譯（macOS target）
-      - name: Build Swift Package
-        run: swift build -c release
+      # 這裡會跑 Tests/CryptoStream-TCATests 底下的邏輯測試
+      - name: Run Unit Tests (iOS Simulator)
+        run: |
+          xcodebuild test \
+            -workspace . \
+            -scheme CryptoStream-TCA \
+            -destination "platform=iOS Simulator,name=iPhone 16,OS=18.1" \
+            -skipMacroValidation
 
-      # 驗證 App 殼專案能編譯
+      # 驗證整體 App 的編譯
       - name: Build iOS App
         run: |
           xcodebuild build \
