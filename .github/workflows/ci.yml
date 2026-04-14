@@ -9,28 +9,31 @@ on:
 jobs:
   test-and-build:
     name: Test and Build
-    runs-on: macos-latest
+    runs-on: macos-14 # 指定較穩定的 macOS 14 環境
     
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 使用目前的 macos-latest 環境中存在的 Xcode 16.0
       - name: Select Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: '16.0'
+          xcode-version: '16.0' # 雖然有 16.2，但我們先用基礎 16.0 確保最廣相容性
 
       - name: Resolve Swift Packages
         run: swift package resolve
 
-      - name: Run Core Logic Tests (SPM)
-        run: swift test -v
+      # 改用 xcodebuild 針對 iOS 模擬器跑測試，這才是正確的 iOS CI 做法
+      - name: Run Core Logic Tests (iOS)
+        run: |
+          xcodebuild test \
+            -scheme CryptoStream-TCA \
+            -destination 'platform=iOS Simulator,name=iPhone 15,OS=latest'
 
       - name: Build iOS App (Xcodeproj)
         run: |
           xcodebuild build \
             -project CryptoApp.xcodeproj \
             -scheme CryptoApp \
-            -destination 'platform=iOS Simulator,name=iPhone 15' \
+            -destination 'platform=iOS Simulator,name=iPhone 15,OS=latest' \
             -clonedSourcePackagesDirPath $HOME/Library/Developer/Xcode/DerivedData/CryptoApp/SourcePackages
