@@ -4,7 +4,7 @@ import Foundation
 
 public typealias CryptoPrice = PriceTick
 
-public struct CryptoReducer: Reducer {
+public struct CryptoReducer: Reducer, Sendable {
     public struct State: Equatable {
         public var currentPrice: CryptoPrice?
         public var priceColor: Color = .primary
@@ -37,6 +37,8 @@ public struct CryptoReducer: Reducer {
         case .onAppear:
             state.connectivityStatus = .connecting
             let url = URL(string: "wss://stream.binance.com:9443/ws/btcusdt@trade")!
+            // Capture dependency locally to avoid self capture in Sendable closure
+            let client = webSocketClient
             
             return .run { send in
                 defer {
@@ -45,7 +47,7 @@ public struct CryptoReducer: Reducer {
                 
                 await send(.updateStatus(.connected))
                 let priceActor = PriceActor()
-                let stream = try await webSocketClient.connect(url)
+                let stream = try await client.connect(url)
                 
                 for try await message in stream {
                     let rawData: Data?
@@ -81,8 +83,9 @@ public struct CryptoReducer: Reducer {
             
         case .onDisappear:
             state.connectivityStatus = .disconnected
+            let client = webSocketClient
             return .run { _ in
-                await webSocketClient.disconnect()
+                await client.disconnect()
             }
             .cancellable(id: CancelID.webSocket)
             
