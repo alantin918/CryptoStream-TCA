@@ -9,14 +9,14 @@ on:
 jobs:
   test-and-build:
     name: Test and Build
-    # 強制使用最新版 macOS 15，原廠預設就會搭載最新版 Swift 編譯器
+    # 關鍵修正 1：換成最新的 macOS 15，預設配備最新 Swift 系統
     runs-on: macos-15
     
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 拋棄第三方的 Action，直接用 Unix 最底層的指令硬切換 Xcode 16.2
+      # 關鍵修正 2：用最底層的終端指令完全強制切換到 Xcode 16.2
       - name: Force Select Xcode 16.2
         run: |
           sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
@@ -25,11 +25,16 @@ jobs:
       - name: Resolve Swift Packages
         run: swift package resolve
 
-      # 現在這裡一定是真真正正的 Swift 6.0 編譯器了！不會再報逗號錯誤。
-      - name: Run Unit Tests
-        run: swift test -v
+      # 在 macOS 上跑單元測試（最穩定，不依賴特定 iOS 模擬器版本）
+      - name: Run Unit Tests (macOS)
+        run: |
+          xcodebuild test \
+            -workspace . \
+            -scheme CryptoStream-TCA \
+            -destination "platform=macOS" \
+            -skipMacroValidation
 
-      # 驗證整體 App 的編譯
+      # 驗證 App 殼專案能針對通用的 iOS Simulator 編譯
       - name: Build iOS App
         run: |
           xcodebuild build \
