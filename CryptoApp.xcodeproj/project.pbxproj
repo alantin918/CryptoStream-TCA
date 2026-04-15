@@ -18,12 +18,12 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		2FBC17DF5A5A8FA08A5E03D9 /* CryptoView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CryptoView.swift; path = Sources/Features/Crypto/CryptoView.swift; sourceTree = "<group>"; };
-		4322A3A1C3423B2333C1FA49 /* CryptoReducer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CryptoReducer.swift; path = Sources/Features/Crypto/CryptoReducer.swift; sourceTree = "<group>"; };
-		6C15F297F43FF2723FBE94FA /* PriceActor.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PriceActor.swift; path = Sources/Domain/Actors/PriceActor.swift; sourceTree = "<group>"; };
-		86B9FFED2F6134FED593C4E7 /* PriceTick.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PriceTick.swift; path = Sources/Domain/Models/PriceTick.swift; sourceTree = "<group>"; };
+		2FBC17DF5A5A8FA08A5E03D9 /* CryptoView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CryptoView.swift; sourceTree = "<group>"; };
+		4322A3A1C3423B2333C1FA49 /* CryptoReducer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CryptoReducer.swift; sourceTree = "<group>"; };
+		6C15F297F43FF2723FBE94FA /* PriceActor.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PriceActor.swift; sourceTree = "<group>"; };
+		86B9FFED2F6134FED593C4E7 /* PriceTick.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PriceTick.swift; sourceTree = "<group>"; };
 		9216E872736815F1A95554A7 /* CryptoApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CryptoApp.swift; sourceTree = "<group>"; };
-		B290EAB68F9605C01895F917 /* WebSocketClient.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = WebSocketClient.swift; path = Sources/Clients/WebSocketClient/WebSocketClient.swift; sourceTree = "<group>"; };
+		B290EAB68F9605C01895F917 /* WebSocketClient.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WebSocketClient.swift; sourceTree = "<group>"; };
 		C60BAB0A5034C5B4DFA60069 /* CryptoApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CryptoApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		EF8D294AD1AAA9D9B51552AC /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 /* End PBXFileReference section */
@@ -63,12 +63,84 @@
 				DFB1BF1B18BA29E5492F0B88 /* Products */,
 				5CC699482F8D9C1A8C0A2DED /* Frameworks */,
 				9216E872736815F1A95554A7 /* CryptoApp.swift */,
+				AA000001111111111111AA01 /* Sources */,
+			);
+			sourceTree = "<group>";
+		};
+		AA000001111111111111AA01 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				AA000001111111111111AA02 /* Clients */,
+				AA000001111111111111AA05 /* Domain */,
+				AA000001111111111111AA09 /* Features */,
+			);
+			name = Sources;
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		AA000001111111111111AA02 /* Clients */ = {
+			isa = PBXGroup;
+			children = (
+				AA000001111111111111AA03 /* WebSocketClient */,
+			);
+			name = Clients;
+			path = Clients;
+			sourceTree = "<group>";
+		};
+		AA000001111111111111AA03 /* WebSocketClient */ = {
+			isa = PBXGroup;
+			children = (
 				B290EAB68F9605C01895F917 /* WebSocketClient.swift */,
-				2FBC17DF5A5A8FA08A5E03D9 /* CryptoView.swift */,
-				4322A3A1C3423B2333C1FA49 /* CryptoReducer.swift */,
-				86B9FFED2F6134FED593C4E7 /* PriceTick.swift */,
+			);
+			name = WebSocketClient;
+			path = WebSocketClient;
+			sourceTree = "<group>";
+		};
+		AA000001111111111111AA05 /* Domain */ = {
+			isa = PBXGroup;
+			children = (
+				AA000001111111111111AA06 /* Actors */,
+				AA000001111111111111AA07 /* Models */,
+			);
+			name = Domain;
+			path = Domain;
+			sourceTree = "<group>";
+		};
+		AA000001111111111111AA06 /* Actors */ = {
+			isa = PBXGroup;
+			children = (
 				6C15F297F43FF2723FBE94FA /* PriceActor.swift */,
 			);
+			name = Actors;
+			path = Actors;
+			sourceTree = "<group>";
+		};
+		AA000001111111111111AA07 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				86B9FFED2F6134FED593C4E7 /* PriceTick.swift */,
+			);
+			name = Models;
+			path = Models;
+			sourceTree = "<group>";
+		};
+		AA000001111111111111AA09 /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				AA000001111111111111AA10 /* Crypto */,
+			);
+			name = Features;
+			path = Features;
+			sourceTree = "<group>";
+		};
+		AA000001111111111111AA10 /* Crypto */ = {
+			isa = PBXGroup;
+			children = (
+				4322A3A1C3423B2333C1FA49 /* CryptoReducer.swift */,
+				2FBC17DF5A5A8FA08A5E03D9 /* CryptoView.swift */,
+			);
+			name = Crypto;
+			path = Crypto;
 			sourceTree = "<group>";
 		};
 		DFB1BF1B18BA29E5492F0B88 /* Products */ = {
