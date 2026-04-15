@@ -24,6 +24,7 @@
 		86B9FFED2F6134FED593C4E7 /* PriceTick.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PriceTick.swift; sourceTree = "<group>"; };
 		9216E872736815F1A95554A7 /* CryptoApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CryptoApp.swift; sourceTree = "<group>"; };
 		B290EAB68F9605C01895F917 /* WebSocketClient.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WebSocketClient.swift; sourceTree = "<group>"; };
+		AA000002222222222222BB01 /* CryptoStream_TCATests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CryptoStream_TCATests.swift; sourceTree = "<group>"; };
 		C60BAB0A5034C5B4DFA60069 /* CryptoApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CryptoApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		EF8D294AD1AAA9D9B51552AC /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 /* End PBXFileReference section */
@@ -64,7 +65,26 @@
 				5CC699482F8D9C1A8C0A2DED /* Frameworks */,
 				9216E872736815F1A95554A7 /* CryptoApp.swift */,
 				AA000001111111111111AA01 /* Sources */,
+				AA000002222222222222BB00 /* Tests */,
 			);
+			sourceTree = "<group>";
+		};
+		AA000002222222222222BB00 /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				AA000002222222222222BB02 /* CryptoStream-TCATests */,
+			);
+			name = Tests;
+			path = Tests;
+			sourceTree = "<group>";
+		};
+		AA000002222222222222BB02 /* CryptoStream-TCATests */ = {
+			isa = PBXGroup;
+			children = (
+				AA000002222222222222BB01 /* CryptoStream_TCATests.swift */,
+			);
+			name = "CryptoStream-TCATests";
+			path = "CryptoStream-TCATests";
 			sourceTree = "<group>";
 		};
 		AA000001111111111111AA01 /* Sources */ = {
