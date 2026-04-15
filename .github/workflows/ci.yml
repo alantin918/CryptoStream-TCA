@@ -18,7 +18,7 @@ jobs:
       - name: Resolve Swift Packages
         run: swift package resolve
 
-      # 第一步：直接在 macOS 原生環境執行單元測試！)
+      # 第一步：直接在 macOS 原生環境執行單元測試！
       - name: Run Unit Tests (macOS)
         run: |
           xcodebuild test \
