@@ -89,9 +89,82 @@ final class CryptoReducerTests: XCTestCase {
         
         await task.cancel()
     }
+    
+    // MARK: - 3. 測試錯誤恢復 (Error Recovery)
+    
+    func testWebSocketErrorHandling() async {
+        let store = TestStore(initialState: CryptoReducer.State()) {
+            CryptoReducer()
+        } withDependencies: {
+            // 模擬連線後立即拋出錯誤
+            $0.webSocketClient.connect = { (_: URL) in
+                throw URLError(.notConnectedToInternet)
+            }
+            $0.webSocketClient.disconnect = {}
+        }
+        
+        // 動作：嘗試開始連線
+        await store.send(.onAppear) {
+            $0.connectivityStatus = .connecting
+        }
+        
+        // 驗證：由於邏輯順序，會先設為 connected
+        await store.receive(.updateStatus(.connected)) {
+            $0.connectivityStatus = .connected
+        }
+        
+        // 驗證：隨後拋出錯誤，切換為 disconnected
+        await store.receive(.updateStatus(.disconnected)) {
+            $0.connectivityStatus = .disconnected
+        }
+    }
+    
+    // MARK: - 4. 測試未知幣種過濾 (Filtering Unknown Symbols)
+    
+    func testUnknownSymbolFiltering() async {
+        let store = TestStore(initialState: CryptoReducer.State()) {
+            CryptoReducer()
+        }
+        
+        // 傳來一個不在預設清單 (BTC, ETH, SOL, BNB, DOGE) 中的幣種
+        let unknownPrice = PriceTick(symbol: "SHIBUSDT", price: 0.00001, timestamp: 1000)
+        
+        // 動作：接收到未知幣種
+        await store.send(.receivePrice(unknownPrice))
+        
+        // 驗證：State 應該沒有任何改變（因為 guard 會擋掉）
+        // 如果 State 發生任何變動，TestStore 會報錯
+    }
 }
 
 final class PriceActorTests: XCTestCase {
+    
+    // MARK: - 5. 測試節流速率 (Throttling Rate Limit)
+    
+    func testThrottlingRateLimit() async {
+        // 設定 10Hz = 每 100ms 只能通關一筆
+        let actor = PriceActor(updatesPerSecond: 10)
+        let symbol = "BTC"
+        
+        let tick1 = PriceTick(symbol: symbol, price: 100.0, timestamp: 1000)
+        let tick2 = PriceTick(symbol: symbol, price: 101.0, timestamp: 1001) // 太頻繁
+        let tick3 = PriceTick(symbol: symbol, price: 102.0, timestamp: 1101) // 101ms 後，應過關
+        
+        // 第一筆：必過
+        var result = await actor.process(next: tick1)
+        XCTAssertNotNil(result)
+        
+        // 第二筆：只過了 1ms，應該被攔截
+        result = await actor.process(next: tick2)
+        XCTAssertNil(result, "1ms 的間隔太短，必須被節流攔截")
+        
+        // 模擬等待 105ms (超過 100ms)
+        try? await Task.sleep(for: .milliseconds(105))
+        
+        // 第三筆：已經超過 100ms 間隔，應該過關
+        result = await actor.process(next: tick3)
+        XCTAssertNotNil(result, "超過 100ms 後，應該允許下一筆資料通過")
+    }
     
     func testMultiSymbolProcessing() async {
         let actor = PriceActor(updatesPerSecond: 1000)
