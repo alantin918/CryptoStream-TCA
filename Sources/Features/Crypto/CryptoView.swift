@@ -1,5 +1,6 @@
 import SwiftUI
 import ComposableArchitecture
+import Charts
 
 public struct CryptoView: View {
     let store: StoreOf<CryptoReducer>
@@ -139,8 +140,8 @@ private struct CoinCardView: View {
                 
                 Spacer()
                 
-                // Sparkline Placeholder (Visual aesthetics)
-                MiniSparkline(color: coin.priceColor)
+                // Real-time Sparkline (using SwiftUI Charts)
+                RealtimeSparkline(history: coin.priceHistory, color: coin.priceColor)
                     .frame(width: 80, height: 35)
             }
         }
@@ -215,18 +216,50 @@ private struct SymbolIcon: View {
     }
 }
 
-private struct MiniSparkline: View {
+private struct RealtimeSparkline: View {
+    let history: [Double]
     let color: Color
     
     var body: some View {
-        // Aesthetic fake sparkline to give "Premium" feel
-        Path { path in
-            path.move(to: CGPoint(x: 0, y: 20))
-            path.addCurve(to: CGPoint(x: 80, y: 10),
-                         control1: CGPoint(x: 20, y: 0),
-                         control2: CGPoint(x: 60, y: 40))
+        // Only show chart if we have at least 2 points
+        if history.count < 2 {
+            // Placeholder while gathering initial data
+            Rectangle()
+                .fill(Color.white.opacity(0.05))
+                .overlay(Text("LOADING").font(.system(size: 8, weight: .black)).foregroundColor(.white.opacity(0.2)))
+        } else {
+            Chart {
+                ForEach(Array(history.enumerated()), id: \.offset) { index, price in
+                    // The glowing line
+                    LineMark(
+                        x: .value("Index", index),
+                        y: .value("Price", price)
+                    )
+                    .foregroundStyle(color)
+                    .interpolationMethod(.monotone)
+                    .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+                    
+                    // The soft gradient area fill
+                    AreaMark(
+                        x: .value("Index", index),
+                        y: .value("Price", price)
+                    )
+                    .foregroundStyle(
+                        LinearGradient(
+                            gradient: Gradient(colors: [color.opacity(0.2), color.opacity(0.0)]),
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .interpolationMethod(.monotone)
+                }
+            }
+            .chartXAxis(.hidden)
+            .chartYAxis(.hidden)
+            // Critical for "Sparkline" effect: don't start at zero, focus on the price delta
+            .chartYScale(domain: .automatic(includesZero: false))
+            .chartXScale(domain: .automatic(includesZero: false))
         }
-        .stroke(color.opacity(0.6), style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
     }
 }
 

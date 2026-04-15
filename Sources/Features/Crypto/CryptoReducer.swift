@@ -12,6 +12,7 @@ public struct CryptoReducer: Reducer, Sendable {
         public var status: String = "Waiting..."
         public var priceColor: Color = .primary
         public var lastUpdate: Date = .distantPast
+        public var priceHistory: [Double] = []
         
         public var symbolDisplayName: String {
             id.replacingOccurrences(of: "usdt", with: "").uppercased()
@@ -113,6 +114,12 @@ public struct CryptoReducer: Reducer, Sendable {
             coin.lastPrice = coin.currentPrice
             coin.currentPrice = tick.price
             coin.lastUpdate = self.date.now
+            
+            // Update history (last 60 points for ~6 seconds of history at 10Hz)
+            coin.priceHistory.append(tick.price)
+            if coin.priceHistory.count > 60 {
+                coin.priceHistory.removeFirst()
+            }
             
             if let last = coin.lastPrice {
                 if tick.price > last {

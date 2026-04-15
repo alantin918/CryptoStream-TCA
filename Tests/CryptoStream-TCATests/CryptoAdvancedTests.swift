@@ -173,6 +173,7 @@ final class CryptoIntegrationTests: XCTestCase {
         await store.receive(.receivePrice(expectedFirstTick), timeout: .seconds(2)) {
             $0.coins[id: "btcusdt"]?.currentPrice = 65000.0
             $0.coins[id: "btcusdt"]?.lastUpdate = testDate
+            $0.coins[id: "btcusdt"]?.priceHistory = [65000.0]
         }
 
         // 清理

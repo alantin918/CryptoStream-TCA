@@ -20,6 +20,7 @@ final class CryptoReducerTests: XCTestCase {
             $0.coins[id: "btcusdt"]?.currentPrice = 50000.0
             $0.coins[id: "btcusdt"]?.priceColor = .primary
             $0.coins[id: "btcusdt"]?.lastUpdate = testDate
+            $0.coins[id: "btcusdt"]?.priceHistory = [50000.0]
         }
         
         // 2. BTC Price goes up
@@ -29,6 +30,7 @@ final class CryptoReducerTests: XCTestCase {
             $0.coins[id: "btcusdt"]?.currentPrice = 50100.0
             $0.coins[id: "btcusdt"]?.priceColor = .green
             $0.coins[id: "btcusdt"]?.lastUpdate = testDate
+            $0.coins[id: "btcusdt"]?.priceHistory = [50000.0, 50100.0]
         }
         
         // 3. Receive ETH Price independently
@@ -37,6 +39,7 @@ final class CryptoReducerTests: XCTestCase {
             $0.coins[id: "ethusdt"]?.currentPrice = 2500.0
             $0.coins[id: "ethusdt"]?.priceColor = .primary
             $0.coins[id: "ethusdt"]?.lastUpdate = testDate
+            $0.coins[id: "ethusdt"]?.priceHistory = [2500.0]
         }
     }
     
@@ -81,6 +84,7 @@ final class CryptoReducerTests: XCTestCase {
         await store.receive(.receivePrice(expectedPrice)) {
             $0.coins[id: "btcusdt"]?.currentPrice = 65000.0
             $0.coins[id: "btcusdt"]?.lastUpdate = testDate
+            $0.coins[id: "btcusdt"]?.priceHistory = [65000.0]
         }
         
         await store.send(.onDisappear) {
