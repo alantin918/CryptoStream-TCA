@@ -22,7 +22,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_16.2.app
+        run: sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
 
       - name: Show build environment
         run: |
@@ -60,12 +60,15 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_16.2.app
+        run: sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
 
       - name: Resolve Swift Package dependencies
         run: swift package resolve
 
       - name: Build for iOS Simulator
+        env:
+          CODE_SIGN_IDENTITY: ""
+          CODE_SIGNING_REQUIRED: "NO"
         run: |
           xcodebuild build \
             -project CryptoApp.xcodeproj \
