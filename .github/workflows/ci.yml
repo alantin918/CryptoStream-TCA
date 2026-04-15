@@ -1,4 +1,4 @@
-name: CI
+name: CryptoStream CI
 
 on:
   push:
@@ -6,74 +6,33 @@ on:
   pull_request:
     branches: [ "main" ]
 
-# Cancel in-progress runs for the same branch to avoid resource waste
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  test:
-    name: Unit Tests (macOS)
+  test-and-build:
+    name: Test and Build
     runs-on: macos-15
-    timeout-minutes: 30
-
+    
     steps:
-      - name: Checkout
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
-
-      - name: Show build environment
-        run: |
-          swift --version
-          xcodebuild -version
-
-      - name: Resolve Swift Package dependencies
+      - name: Resolve Swift Packages
         run: swift package resolve
 
-      - name: Run unit tests
+      # 第一步：直接在 macOS 原生環境執行單元測試！)
+      - name: Run Unit Tests (macOS)
         run: |
           xcodebuild test \
             -workspace . \
             -scheme CryptoStream-TCA \
             -destination "platform=macOS" \
-            -skipMacroValidation \
-            -resultBundlePath TestResults.xcresult
+            -skipMacroValidation
 
-      - name: Upload test results
-        uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: test-results
-          path: TestResults.xcresult
-          retention-days: 7
-
-  build:
-    name: Build iOS App
-    runs-on: macos-15
-    timeout-minutes: 30
-    needs: test
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
-
-      - name: Resolve Swift Package dependencies
-        run: swift package resolve
-
-      - name: Build for iOS Simulator
-        env:
-          CODE_SIGN_IDENTITY: ""
-          CODE_SIGNING_REQUIRED: "NO"
+      # 第二步：驗證 iOS App 本體可以正常編譯
+      - name: Build iOS App
         run: |
           xcodebuild build \
             -project CryptoApp.xcodeproj \
             -scheme CryptoApp \
             -destination "generic/platform=iOS Simulator" \
-            -skipMacroValidation \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO
+            -skipMacroValidation
+
