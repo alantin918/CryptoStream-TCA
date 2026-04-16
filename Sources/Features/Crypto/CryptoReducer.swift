@@ -115,9 +115,9 @@ public struct CryptoReducer: Reducer, Sendable {
             coin.currentPrice = tick.price
             coin.lastUpdate = self.date.now
             
-            // Update history (last 60 points for ~6 seconds of history at 10Hz)
+            // Update history (last 100 points for ~10 seconds of history at 10Hz)
             coin.priceHistory.append(tick.price)
-            if coin.priceHistory.count > 60 {
+            if coin.priceHistory.count > 100 {
                 coin.priceHistory.removeFirst()
             }
             
