@@ -1,38 +1,125 @@
 # CryptoStream-TCA
 
-基於 **The Composable Architecture (TCA)** 與 **Clean Architecture** 實作的加密貨幣即時報價範例專案。
+> A production-quality iOS cryptocurrency dashboard built with **The Composable Architecture (TCA)**, featuring real-time Binance WebSocket streaming, Swift 6 strict concurrency, and a premium Glassmorphism UI.
 
-## 專案功能與技術特性
+[![CI](https://github.com/alantin918/CryptoStream-TCA/actions/workflows/ci.yml/badge.svg)](https://github.com/alantin918/CryptoStream-TCA/actions/workflows/ci.yml)
+![Swift](https://img.shields.io/badge/Swift-6.0-orange?logo=swift)
+![Platform](https://img.shields.io/badge/Platform-iOS%2016%2B-blue?logo=apple)
+![Architecture](https://img.shields.io/badge/Architecture-TCA-purple)
 
-*   **架構分層**：採用 Clean Architecture 原則，劃分 Domain、Clients 與 Features，降低各模組間的耦合度。
-*   **即時資料串接**：透過 `URLSessionWebSocketTask` 介接 Binance WebSocket (BTC/USDT 交易對)。
-*   **並發安全管理**：使用 Swift Actor 實作 `PriceActor`，處理高頻資料的節流 (Throttling) 與亂序過濾，確保 UI 更新頻率穩定。
-*   **使用者介面**：使用 SwiftUI 實作，包含基本的連線狀態指示與價格漲跌變色動畫。
-*   **單元測試**：包含針對 Reducer 狀態流與 Actor 過濾邏輯的測試案例。
+---
 
-## 使用技術
+## ✨ Features
 
-*   **語言**: Swift 6
-*   **框架**: SwiftUI, Composable Architecture (TCA 1.0.0)
-*   **連線協定**: WebSocket
-*   **測試工具**: XCTest
+| Feature | Description |
+|---|---|
+| 📈 **Real-time Sparklines** | Live price charts powered by SwiftUI Charts, updating at 10Hz with ultra-zoom auto-scaling |
+| ⚡ **WebSocket Streaming** | Connects to Binance public WebSocket API for BTC, ETH, SOL, BNB & DOGE |
+| 🧵 **Swift 6 Concurrency** | `PriceActor` enforces thread-safe state with timestamp-based out-of-order rejection |
+| 🎚️ **10Hz Throttling** | Per-symbol throttle gate prevents UI overload without dropping data integrity |
+| 🔄 **Auto-Reconnect** | Detects foreground/background transitions via `scenePhase` and reconnects automatically |
+| 💎 **Glassmorphism UI** | Dark mode, `.ultraThinMaterial` cards, animated ambient light blobs, and price pulse effects |
+| 🧪 **12 Test Cases** | Unit, integration, and concurrency stress tests covering the full data pipeline |
 
-## 目錄結構
+---
 
-```text
-Sources/
-├── Domain/           # 業務模型與 Actor 邏輯
-├── Clients/          # 網路連線實作 (WebSocketClient)
-└── Features/         # UI 視圖與 Reducer 邏輯
-Tests/                # 單元測試程式碼
+## 🏗️ Architecture
+
+This project follows **Clean Architecture** principles layered on top of TCA's unidirectional data flow:
+
+```
+CryptoStream-TCA/
+├── Sources/
+│   ├── Clients/
+│   │   └── WebSocketClient/     # Network abstraction (dependency-injected)
+│   ├── Domain/
+│   │   ├── Actors/
+│   │   │   └── PriceActor       # Swift Actor: throttling + out-of-order filtering
+│   │   └── Models/
+│   │       └── PriceTick        # Core domain model
+│   └── Features/
+│       └── Crypto/
+│           ├── CryptoReducer    # TCA Reducer: state machine + side effects
+│           └── CryptoView       # SwiftUI View + real-time sparkline charts
+└── Tests/
+    └── CryptoStream-TCATests/
+        ├── CryptoStream_TCATests    # Reducer & Actor unit tests
+        └── CryptoAdvancedTests      # Concurrency stress & integration tests
 ```
 
-## 如何運行
+### Data Flow
 
-1.  開啟 `CryptoApp.xcodeproj`。
-2.  選擇目標設備（建議使用 iOS 16 以上版本）。
-3.  執行專案即可自動連線並顯示即時報價。
+```
+Binance WSS → WebSocketClient → CryptoReducer → PriceActor (10Hz gate) → State → SwiftUI
+```
 
-## 運行測試
+---
 
-在 Xcode 中點擊 `Product` -> `Test` 或使用快捷鍵 `Cmd + U`。
+## 🧪 Test Coverage
+
+| Test Suite | Cases | Description |
+|---|---|---|
+| `CryptoReducerTests` | 4 | Price coloring, lifecycle, error recovery, symbol filter |
+| `PriceActorTests` | 2 | 10Hz throttle validation, multi-symbol independence |
+| `PriceActorConcurrencyTests` | 4 | Burst (100 concurrent tasks), sequential stress, cross-symbol isolation, out-of-order rejection |
+| `CryptoIntegrationTests` | 2 | End-to-end WebSocket → Actor → State pipeline, malformed JSON resilience |
+
+---
+
+## 🚀 Getting Started
+
+### Requirements
+
+- Xcode 16.2+
+- iOS 16+ Simulator or Device
+- macOS 13+ (for running unit tests)
+
+### Installation
+
+```bash
+git clone https://github.com/alantin918/CryptoStream-TCA.git
+cd CryptoStream-TCA
+open CryptoApp.xcodeproj
+```
+
+> Xcode will automatically resolve the Swift Package dependencies on first open.
+
+### Running the App
+
+1. Open `CryptoApp.xcodeproj`
+2. Select an iOS 16+ Simulator
+3. Press `Cmd + R` — the app will connect to Binance and start streaming live prices immediately
+
+### Running Tests
+
+```bash
+# In Xcode
+Cmd + U
+
+# Or via command line
+xcodebuild test \
+  -workspace . \
+  -scheme CryptoStream-TCA \
+  -destination "platform=macOS" \
+  -skipMacroValidation
+```
+
+---
+
+## 🛠️ Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Language | Swift 6 (strict concurrency) |
+| Architecture | The Composable Architecture (TCA 1.17+) |
+| UI | SwiftUI + Charts framework |
+| Concurrency | Swift Actor, AsyncThrowingStream |
+| Networking | URLSessionWebSocketTask |
+| Testing | XCTest, TCA TestStore |
+| CI | GitHub Actions on macOS 15 + Xcode 16.2 |
+
+---
+
+## 📄 License
+
+This project is available under the MIT License.
