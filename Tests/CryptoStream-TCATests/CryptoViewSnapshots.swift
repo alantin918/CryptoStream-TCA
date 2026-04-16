@@ -8,32 +8,36 @@ import ComposableArchitecture
 //
 // 🎯 目的：確保 Glassmorphism UI 在每次代碼變動後視覺上不會發生意外退化。
 //
-// 📸 使用方式：
-//   - 第一次執行：測試會「失敗」並在 __Snapshots__ 資料夾下生成參考圖（此為正常行為）。
-//   - 往後執行：自動將目前畫面與參考圖做像素級比對。
-//   - 需要重新錄製：將 `isRecording = true` 取消註解並執行一次，之後再改回 false。
+// 📸 使用方式（兩步驟設定）：
+//   步驟一：在本地 Xcode 按 Cmd+U 執行一次（isRecording = true 時會「失敗」並生成參考圖）
+//   步驟二：將生成的 __Snapshots__ 資料夾 git add & git push 後，CI 就能正常比對
 //
-// ⚠️ 環境注意：參考圖以 macOS 環境為主，與 CI 環境保持一致。
+// ⚠️ CI 注意：CI 首次跑到這個測試前，必須先有本地生成的參考圖才能成功。
 
 @MainActor
 final class CryptoViewSnapshotTests: XCTestCase {
 
-    // ── 1. 初始連線中狀態 ─────────────────────────────────────────────
-    // 驗證：黃色燈號 + 所有幣種顯示「---.---」佔位符
+    // 👇 首次在本地執行時，設為 true 生成參考圖；生成後改回 false
+    let record = false
+
+    // macOS 環境下使用的 Sparkline 渲染尺寸
+    private let snapshotSize = CGSize(width: 393, height: 852)
+
+    // ── 1. 初始連線中狀態 ────────────────────────────────────────────
     func testConnectingState() {
         var state = CryptoReducer.State()
         state.connectivityStatus = .connecting
-
-        let view = makeView(state: state)
-        assertSnapshot(of: view, as: .image(layout: .fixed(width: 393, height: 852)))
+        assertSnapshot(
+            of: makeHostingController(state: state),
+            as: .image(size: snapshotSize),
+            record: record
+        )
     }
 
-    // ── 2. 已連線並載入真實價格 ───────────────────────────────────────
-    // 驗證：綠色燈號 + 5 種幣種的價格正確顯示
+    // ── 2. 已連線並載入真實價格 ──────────────────────────────────────
     func testConnectedWithPrices() {
         var state = CryptoReducer.State()
         state.connectivityStatus = .connected
-
         state.coins[id: "btcusdt"]?.currentPrice = 67_432.50
         state.coins[id: "btcusdt"]?.priceColor = .green
         state.coins[id: "ethusdt"]?.currentPrice = 3_215.78
@@ -44,17 +48,17 @@ final class CryptoViewSnapshotTests: XCTestCase {
         state.coins[id: "bnbusdt"]?.priceColor = .primary
         state.coins[id: "dogeusdt"]?.currentPrice = 0.1587
         state.coins[id: "dogeusdt"]?.priceColor = .red
-
-        let view = makeView(state: state)
-        assertSnapshot(of: view, as: .image(layout: .fixed(width: 393, height: 852)))
+        assertSnapshot(
+            of: makeHostingController(state: state),
+            as: .image(size: snapshotSize),
+            record: record
+        )
     }
 
-    // ── 3. 價格上漲閃爍視覺 (Price Surge) ────────────────────────────
-    // 驗證：所有幣種同時顯示綠色（大漲行情）
+    // ── 3. 全幣種大漲行情 ────────────────────────────────────────────
     func testAllPricesSurging() {
         var state = CryptoReducer.State()
         state.connectivityStatus = .connected
-
         state.coins[id: "btcusdt"]?.currentPrice = 70_000.00
         state.coins[id: "btcusdt"]?.priceColor = .green
         state.coins[id: "ethusdt"]?.currentPrice = 4_000.00
@@ -65,42 +69,54 @@ final class CryptoViewSnapshotTests: XCTestCase {
         state.coins[id: "bnbusdt"]?.priceColor = .green
         state.coins[id: "dogeusdt"]?.currentPrice = 0.25
         state.coins[id: "dogeusdt"]?.priceColor = .green
-
-        let view = makeView(state: state)
-        assertSnapshot(of: view, as: .image(layout: .fixed(width: 393, height: 852)))
+        assertSnapshot(
+            of: makeHostingController(state: state),
+            as: .image(size: snapshotSize),
+            record: record
+        )
     }
 
-    // ── 4. 斷線狀態 ───────────────────────────────────────────────────
-    // 驗證：紅色燈號 + 最後已知的價格數字仍然顯示（不清空）
+    // ── 4. 斷線狀態 ──────────────────────────────────────────────────
     func testDisconnectedState() {
         var state = CryptoReducer.State()
         state.connectivityStatus = .disconnected
-
-        // 斷線後仍應保留最後一次的价格資料
         state.coins[id: "btcusdt"]?.currentPrice = 65_000.00
         state.coins[id: "ethusdt"]?.currentPrice = 3_100.00
         state.coins[id: "solusdt"]?.currentPrice = 130.00
-
-        let view = makeView(state: state)
-        assertSnapshot(of: view, as: .image(layout: .fixed(width: 393, height: 852)))
+        assertSnapshot(
+            of: makeHostingController(state: state),
+            as: .image(size: snapshotSize),
+            record: record
+        )
     }
 
-    // ── 5. 空值初始狀態（無任何價格） ────────────────────────────────
-    // 驗證：所有幣種顯示「---.---」佔位符，且 UI 不崩潰
+    // ── 5. 空值初始狀態 ──────────────────────────────────────────────
     func testInitialEmptyState() {
         let state = CryptoReducer.State()
-        let view = makeView(state: state)
-        assertSnapshot(of: view, as: .image(layout: .fixed(width: 393, height: 852)))
+        assertSnapshot(
+            of: makeHostingController(state: state),
+            as: .image(size: snapshotSize),
+            record: record
+        )
     }
 
     // MARK: - Helpers
 
-    private func makeView(state: CryptoReducer.State) -> some View {
-        let store = Store(initialState: state) {
-            // 使用空 Reducer，避免 Side Effects 影響快照的穩定性
-            EmptyReducer()
+    private func makeHostingController(state: CryptoReducer.State) -> NSViewController {
+        // 明確指定泛型型別，修復 CI 的型別推斷錯誤
+        let store = Store<CryptoReducer.State, CryptoReducer.Action>(
+            initialState: state
+        ) {
+            // 使用空 Reducer 避免 Side Effects（WebSocket）影響快照穩定性
+            CryptoReducer()
+        } withDependencies: {
+            // 在測試中，connect 永遠返回一個不會產生訊息的空 Stream
+            $0.webSocketClient.connect = { _ in
+                AsyncThrowingStream { _ in }
+            }
+            $0.webSocketClient.disconnect = {}
         }
-        return CryptoView(store: store)
-            .preferredColorScheme(.dark)
+        let rootView = CryptoView(store: store).preferredColorScheme(.dark)
+        return NSHostingController(rootView: rootView)
     }
 }
