@@ -5,6 +5,9 @@ import Charts
 public struct CryptoView: View {
     let store: StoreOf<CryptoReducer>
     
+    // 監聽 App 的前景/背景狀態
+    @Environment(\.scenePhase) private var scenePhase
+    
     public init(store: StoreOf<CryptoReducer>) {
         self.store = store
     }
@@ -55,6 +58,21 @@ public struct CryptoView: View {
             .preferredColorScheme(.dark)
             .onAppear { viewStore.send(.onAppear) }
             .onDisappear { viewStore.send(.onDisappear) }
+            // 監聽前景/背景切換，確保 WebSocket 連線不中斷
+            .onChange(of: scenePhase) { phase in
+                switch phase {
+                case .active:
+                    // 回到前台：若狀態為 disconnected，重新啟動連線
+                    if viewStore.connectivityStatus == .disconnected {
+                        viewStore.send(.onAppear)
+                    }
+                case .background:
+                    // 進入背景：主動斷開連線，避免 iOS 在背景強制終止造成狀態不一致
+                    viewStore.send(.onDisappear)
+                default:
+                    break
+                }
+            }
         }
     }
 }
@@ -142,7 +160,7 @@ private struct CoinCardView: View {
                 
                 // Real-time Sparkline (using SwiftUI Charts)
                 RealtimeSparkline(history: coin.priceHistory, color: coin.priceColor)
-                    .frame(width: 80, height: 35)
+                    .frame(width: 100, height: 35)
             }
         }
         .padding(24)
@@ -220,17 +238,33 @@ private struct RealtimeSparkline: View {
     let history: [Double]
     let color: Color
     
+    // 計算歷史數據的範圍，用於強迫 Y 軸極度縮放
+    private var priceRange: (min: Double, max: Double) {
+        let min = history.min() ?? 0
+        let max = history.max() ?? 0
+        
+        // 如果所有價格都一樣（平盤），給一個微小的上下邊距防止 Chart 崩潰
+        if min == max {
+            return (min: min * 0.9999, max: max * 1.0001)
+        }
+        
+        // 增加 5% 的上下緩衝空間，讓曲線不至於貼邊
+        let delta = max - min
+        return (min: min - (delta * 0.05), max: max + (delta * 0.05))
+    }
+    
     var body: some View {
-        // Only show chart if we have at least 2 points
         if history.count < 2 {
-            // Placeholder while gathering initial data
             Rectangle()
                 .fill(Color.white.opacity(0.05))
-                .overlay(Text("LOADING").font(.system(size: 8, weight: .black)).foregroundColor(.white.opacity(0.2)))
+                .overlay(
+                    Text("WAITING")
+                        .font(.system(size: 8, weight: .black))
+                        .foregroundColor(.white.opacity(0.2))
+                )
         } else {
             Chart {
                 ForEach(Array(history.enumerated()), id: \.offset) { index, price in
-                    // The glowing line
                     LineMark(
                         x: .value("Index", index),
                         y: .value("Price", price)
@@ -239,7 +273,6 @@ private struct RealtimeSparkline: View {
                     .interpolationMethod(.monotone)
                     .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
                     
-                    // The soft gradient area fill
                     AreaMark(
                         x: .value("Index", index),
                         y: .value("Price", price)
@@ -256,9 +289,11 @@ private struct RealtimeSparkline: View {
             }
             .chartXAxis(.hidden)
             .chartYAxis(.hidden)
-            // Critical for "Sparkline" effect: don't start at zero, focus on the price delta
-            .chartYScale(domain: .automatic(includesZero: false))
+            // 強制設定 Y 軸範圍，實現極度縮放
+            .chartYScale(domain: priceRange.min...priceRange.max)
             .chartXScale(domain: .automatic(includesZero: false))
+            .animation(.easeInOut(duration: 0.3), value: history)
+            .clipped() // 防止 AreaMark 漸層渲染超出卡片邊界
         }
     }
 }
