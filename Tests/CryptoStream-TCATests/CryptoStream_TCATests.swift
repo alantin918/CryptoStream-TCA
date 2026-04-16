@@ -146,28 +146,25 @@ final class PriceActorTests: XCTestCase {
     // MARK: - 5. 測試節流速率 (Throttling Rate Limit)
     
     func testThrottlingRateLimit() async {
-        // 設定 10Hz = 每 100ms 只能通關一筆
+        // 設定 10Hz = 每 100ms 只能通關一筆 (minInterval = 100ms)
         let actor = PriceActor(updatesPerSecond: 10)
         let symbol = "BTC"
-        
+
         let tick1 = PriceTick(symbol: symbol, price: 100.0, timestamp: 1000)
-        let tick2 = PriceTick(symbol: symbol, price: 101.0, timestamp: 1001) // 太頻繁
-        let tick3 = PriceTick(symbol: symbol, price: 102.0, timestamp: 1101) // 101ms 後，應過關
-        
-        // 第一筆：必過
+        let tick2 = PriceTick(symbol: symbol, price: 101.0, timestamp: 1001)  // 1ms 後，太近
+        let tick3 = PriceTick(symbol: symbol, price: 102.0, timestamp: 1101)  // 101ms 後，應過關
+
+        // 第一筆：必過（無歷史記錄）
         var result = await actor.process(next: tick1)
         XCTAssertNotNil(result)
-        
-        // 第二筆：只過了 1ms，應該被攔截
+
+        // 第二筆：只過了 1ms，應該被節流攔截
         result = await actor.process(next: tick2)
-        XCTAssertNil(result, "1ms 的間隔太短，必須被節流攔截")
-        
-        // 模擬等待 105ms (超過 100ms)
-        try? await Task.sleep(for: .milliseconds(105))
-        
-        // 第三筆：已經超過 100ms 間隔，應該過關
+        XCTAssertNil(result, "間隔 1ms < 100ms，必須被節流攔截")
+
+        // 第三筆：timestamp 差距 101ms ≥ 100ms，應該過關（純 timestamp 判斷，無需真實等待）
         result = await actor.process(next: tick3)
-        XCTAssertNotNil(result, "超過 100ms 後，應該允許下一筆資料通過")
+        XCTAssertNotNil(result, "間隔 101ms ≥ 100ms，應允許通過")
     }
     
     func testMultiSymbolProcessing() async {
