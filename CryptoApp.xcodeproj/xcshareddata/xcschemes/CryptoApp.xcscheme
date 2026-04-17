@@ -15,7 +15,7 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "74ADD0D872CBCCD34925D147"
+               BlueprintIdentifier = "C805AD50BB6FFA08863ED8DD"
                BuildableName = "CryptoApp.app"
                BlueprintName = "CryptoApp"
                ReferencedContainer = "container:CryptoApp.xcodeproj">
@@ -44,7 +44,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "74ADD0D872CBCCD34925D147"
+            BlueprintIdentifier = "C805AD50BB6FFA08863ED8DD"
             BuildableName = "CryptoApp.app"
             BlueprintName = "CryptoApp"
             ReferencedContainer = "container:CryptoApp.xcodeproj">
@@ -61,7 +61,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "74ADD0D872CBCCD34925D147"
+            BlueprintIdentifier = "C805AD50BB6FFA08863ED8DD"
             BuildableName = "CryptoApp.app"
             BlueprintName = "CryptoApp"
             ReferencedContainer = "container:CryptoApp.xcodeproj">
