@@ -357,6 +357,9 @@ private struct CoinDetailView: View {
                                         Text(tf.displayName)
                                             .font(.system(size: 12, weight: .bold))
                                             .foregroundColor(coin.selectedTimeframe == tf ? .white : .white.opacity(0.4))
+                                            .lineLimit(1)
+                                            .minimumScaleFactor(0.8)
+                                            .fixedSize(horizontal: true, vertical: false)
                                             .padding(.horizontal, 10)
                                             .padding(.vertical, 4)
                                             .background(
