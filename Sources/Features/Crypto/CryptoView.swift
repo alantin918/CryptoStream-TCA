@@ -418,11 +418,17 @@ private struct RealtimeSparkline: View {
     @State private var wavePhase: Double = 0
     
     private var priceRange: (min: Double, max: Double) {
-        let min = history.min() ?? 0
-        let max = history.max() ?? 0
-        if min == max { return (min: min * 0.9999, max: max * 1.0001) }
-        let delta = max - min
-        return (min: min - (delta * 0.05), max: max + (delta * 0.05))
+        guard let minPrice = history.min(), let maxPrice = history.max(), let last = history.last else {
+             return (0, 1)
+        }
+        
+        let actualDelta = maxPrice - minPrice
+        // 限制最小的 Y 軸縮放範圍 (0.2%)，防止當數據點太少或波動極小時，圖表發生劇烈的上下浮動 (vertigo)
+        let minDelta = last * 0.002
+        let effectiveDelta = max(actualDelta, minDelta)
+        
+        let center = (maxPrice + minPrice) / 2
+        return (min: center - (effectiveDelta * 0.55), max: center + (effectiveDelta * 0.55))
     }
     
     private var chartData: [(index: Int, price: Double)] {
