@@ -46,6 +46,38 @@ final class CryptoReducerTests: XCTestCase {
         }
     }
     
+    func testHistoricalDataLogic() async {
+        let testDate = Date(timeIntervalSince1970: 1234567890)
+        let store = TestStore(initialState: CryptoReducer.State()) {
+            CryptoReducer()
+        } withDependencies: {
+            $0.date.now = testDate
+        }
+        
+        let testCoinId = "btcusdt"
+        
+        // Test receiveHistoricalData updates state correctly
+        let mockPrices = [100.0, 105.0, 110.0]
+        await store.send(.receiveHistoricalData(coinId: testCoinId, prices: mockPrices)) {
+            $0.coins[id: testCoinId]?.isFetchingHistory = false
+            $0.coins[id: testCoinId]?.historicalPrices = mockPrices
+        }
+        
+        // Test receiveKline updating the very last price of the history array
+        let tick = KlineTick(symbol: testCoinId, open: 110.0, high: 115.0, low: 109.0, close: 112.0, eventTime: 1000, openTime: 1000, isClosed: false)
+        await store.send(.receiveKline(tick)) {
+            $0.coins[id: testCoinId]?.currentPrice = 112.0
+            $0.coins[id: testCoinId]?.lastPrice = nil
+            $0.coins[id: testCoinId]?.priceColor = .green
+            $0.coins[id: testCoinId]?.lastUpdate = store.dependencies.date.now
+            $0.coins[id: testCoinId]?.klineHistory = [tick]
+            $0.coins[id: testCoinId]?.sparklineBuffer = [112.0]
+            
+            // This is the key part: the last historical price should be updated to match the real-time close price
+            $0.coins[id: testCoinId]?.historicalPrices = [100.0, 105.0, 112.0]
+        }
+    }
+    
     func testConnectionLifecycle() async {
         let testDate = Date(timeIntervalSince1970: 1672515782)
         nonisolated(unsafe) var continuation: AsyncThrowingStream<URLSessionWebSocketTask.Message, Error>.Continuation!
