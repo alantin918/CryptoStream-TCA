@@ -247,66 +247,6 @@ private struct SymbolIcon: View {
         }
     }
 }
-
-private struct CandlestickChart: View {
-    let history: [KlineTick]
-    
-    // 計算歷史數據的高低範圍，用於 Y 軸極度縮放
-    private var priceRange: (min: Double, max: Double) {
-        let min = history.map { $0.low }.min() ?? 0
-        let max = history.map { $0.high }.max() ?? 0
-        
-        // 如果幾乎平盤
-        if min == max {
-            return (min: min * 0.9999, max: max * 1.0001)
-        }
-        
-        let delta = max - min
-        return (min: min - (delta * 0.05), max: max + (delta * 0.05))
-    }
-    
-    var body: some View {
-        if history.isEmpty {
-            Rectangle()
-                .fill(Color.white.opacity(0.05))
-                .overlay(
-                    Text("WAITING")
-                        .font(.system(size: 8, weight: .black))
-                        .foregroundColor(.white.opacity(0.2))
-                )
-        } else {
-            Chart {
-                ForEach(Array(history.enumerated()), id: \.offset) { index, kline in
-                    // Wicks (High to Low Shadow)
-                    RuleMark(
-                        x: .value("Index", index),
-                        yStart: .value("Low", kline.low),
-                        yEnd: .value("High", kline.high)
-                    )
-                    .foregroundStyle(kline.close >= kline.open ? Color.green : Color.red)
-                    .lineStyle(StrokeStyle(lineWidth: 1.5))
-                    
-                    // Real Body (Open to Close)
-                    RectangleMark(
-                        x: .value("Index", index),
-                        yStart: .value("Open", kline.open),
-                        yEnd: .value("Close", kline.close),
-                        width: .fixed(4) // 調整寬度以適應 100pt x 20 根
-                    )
-                    .foregroundStyle(kline.close >= kline.open ? Color.green : Color.red)
-                }
-            }
-            .chartXAxis(.hidden)
-            .chartYAxis(.hidden)
-            // 強制設定 Y 軸範圍
-            .chartYScale(domain: priceRange.min...priceRange.max)
-            .chartXScale(domain: .automatic(includesZero: false))
-            .animation(.easeInOut(duration: 0.1), value: history.last?.close ?? 0)
-            .clipped() // 防止繪製區域超出 frame
-        }
-    }
-}
-
 private struct CapsuleIndicator: View {
     let color: Color
     var body: some View {
@@ -414,30 +354,15 @@ private struct CoinDetailView: View {
                         .padding(.horizontal, 24)
                     }
                     
-                    // Professional Candlestick Chart
+                    // Professional Trend Line
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("1M CANDLESTICK")
-                            .font(.system(size: 14, weight: .bold, design: .monospaced))
-                            .foregroundColor(.white.opacity(0.6))
-                            .padding(.horizontal, 24)
-                        
-                        CandlestickChart(history: coin.klineHistory)
-                            .frame(height: 250)
-                            .padding()
-                            .background(Color.white.opacity(0.02))
-                            .cornerRadius(16)
-                            .padding(.horizontal, 16)
-                    }
-                    
-                    // Trend Line (Sparkline)
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("SMOOTH TREND")
+                        Text("1H PRICE TREND")
                             .font(.system(size: 14, weight: .bold, design: .monospaced))
                             .foregroundColor(.white.opacity(0.6))
                             .padding(.horizontal, 24)
                         
                         RealtimeSparkline(history: coin.klineHistory.map(\.close), color: coin.priceColor)
-                            .frame(height: 120)
+                            .frame(height: 250)
                             .padding()
                             .background(Color.white.opacity(0.02))
                             .cornerRadius(16)
