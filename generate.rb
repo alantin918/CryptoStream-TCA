@@ -1,5 +1,17 @@
 require 'xcodeproj'
 
+# 從本機的 .teamid 檔案讀取 Team ID（此檔案不會提交到 git）
+# 如果沒有此檔案，Xcode 每次都要手動選擇 Team
+team_id = ''
+team_id_file = '.teamid'
+if File.exist?(team_id_file)
+  team_id = File.read(team_id_file).strip
+  puts "Using Team ID: #{team_id}"
+else
+  puts "Tip: Create a .teamid file with your Apple Team ID to avoid re-selecting team each time."
+  puts "     Example: echo 'AB12CD34EF' > .teamid"
+end
+
 project = Xcodeproj::Project.new('CryptoApp.xcodeproj')
 target = project.new_target(:application, 'CryptoApp', :ios, '16.0')
 
@@ -13,7 +25,7 @@ target.build_configurations.each do |config|
   config.build_settings['INFOPLIST_KEY_UIRequiresFullScreen'] = 'YES'
   config.build_settings['GENERATE_INFOPLIST_FILE'] = 'YES'
   config.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'com.gemini.CryptoApp'
-  config.build_settings['DEVELOPMENT_TEAM'] = '' # User will select this
+  config.build_settings['DEVELOPMENT_TEAM'] = team_id
 end
 
 main_group = project.main_group

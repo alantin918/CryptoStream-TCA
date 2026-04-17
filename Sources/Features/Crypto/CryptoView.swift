@@ -410,59 +410,25 @@ private struct StatBox: View {
     }
 }
 
-// MARK: - Restore RealtimeSparkline
+// MARK: - RealtimeSparkline (Canvas-based, zero animation)
 private struct RealtimeSparkline: View {
     let history: [Double]
     let color: Color
-    
+
+    // Skeleton wave phase
     @State private var wavePhase: Double = 0
-    
-    private var priceRange: (min: Double, max: Double) {
-        guard let minPrice = history.min(), let maxPrice = history.max(), let last = history.last else {
-             return (0, 1)
-        }
-        
-        let actualDelta = maxPrice - minPrice
-        // 限制最小的 Y 軸縮放範圍 (0.2%)，防止當數據點太少或波動極小時，圖表發生劇烈的上下浮動 (vertigo)
-        let minDelta = last * 0.002
-        let effectiveDelta = max(actualDelta, minDelta)
-        
-        let center = (maxPrice + minPrice) / 2
-        return (min: center - (effectiveDelta * 0.55), max: center + (effectiveDelta * 0.55))
-    }
-    
-    private var chartData: [(index: Int, price: Double)] {
-        if history.isEmpty { return [] }
-        if history.count == 1 {
-            return [(index: 0, price: history[0]), (index: 1, price: history[0])]
-        }
-        return history.enumerated().map { (index: $0.offset, price: $0.element) }
-    }
-    
+
     var body: some View {
         if history.isEmpty {
-            // Skeleton Loader: Animated Sine Wave
+            // Skeleton Loader: Animated Sine Wave (Charts can be used here since no real data)
             Chart {
                 ForEach(0..<40, id: \.self) { index in
                     LineMark(
                         x: .value("Index", index),
                         y: .value("Price", sin(Double(index) * 0.3 + wavePhase))
                     )
-                    .foregroundStyle(Color.white.opacity(0.1))
-                    .lineStyle(StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
-                    
-                    AreaMark(
-                        x: .value("Index", index),
-                        yStart: .value("Min", -1.5),
-                        yEnd: .value("Price", sin(Double(index) * 0.3 + wavePhase))
-                    )
-                    .foregroundStyle(
-                        LinearGradient(
-                            gradient: Gradient(colors: [Color.white.opacity(0.05), Color.clear]),
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
+                    .foregroundStyle(Color.white.opacity(0.12))
+                    .lineStyle(StrokeStyle(lineWidth: 1.5, lineCap: .round))
                 }
             }
             .chartXAxis(.hidden)
@@ -475,34 +441,60 @@ private struct RealtimeSparkline: View {
                 }
             }
         } else {
-            Chart {
-                ForEach(chartData, id: \.index) { item in
-                    LineMark(
-                        x: .value("Index", item.index),
-                        y: .value("Price", item.price)
-                    )
-                    .foregroundStyle(color)
-                    .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
-                    
-                    // 使用 y: 而非 yStart/yEnd，避免 yStart 隨 priceRange.min 改變時觸發上浮補間動畫
-                    AreaMark(
-                        x: .value("Index", item.index),
-                        y: .value("Price", item.price)
-                    )
-                    .foregroundStyle(
-                        LinearGradient(
-                            gradient: Gradient(colors: [color.opacity(0.35), color.opacity(0.0)]),
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
+            // Canvas-based drawing: no SwiftUI Charts, no implicit transitions, no floating
+            Canvas { context, size in
+                guard history.count >= 1 else { return }
+
+                let minVal = history.min() ?? 0
+                let maxVal = history.max() ?? 1
+                let delta = maxVal - minVal
+                // 最小縮放 0.2%，防止平盤時 Y 軸過度放大
+                let minDelta = max(delta, (maxVal + minVal) / 2 * 0.002)
+                let padding = minDelta * 0.1
+                let low  = ((maxVal + minVal) / 2) - (minDelta / 2) - padding
+                let high = ((maxVal + minVal) / 2) + (minDelta / 2) + padding
+                let range = high - low
+
+                let totalSlots: CGFloat = 40
+                let xStep = size.width / totalSlots
+
+                func xPos(_ i: Int) -> CGFloat { CGFloat(i) * xStep }
+                func yPos(_ v: Double) -> CGFloat {
+                    size.height - CGFloat((v - low) / range) * size.height
                 }
+
+                // --- Gradient area fill ---
+                var areaPath = Path()
+                areaPath.move(to: CGPoint(x: xPos(0), y: size.height))
+                for (i, price) in history.enumerated() {
+                    areaPath.addLine(to: CGPoint(x: xPos(i), y: yPos(price)))
+                }
+                areaPath.addLine(to: CGPoint(x: xPos(history.count - 1), y: size.height))
+                areaPath.closeSubpath()
+
+                context.fill(
+                    areaPath,
+                    with: .linearGradient(
+                        Gradient(colors: [color.opacity(0.4), color.opacity(0.0)]),
+                        startPoint: CGPoint(x: 0, y: 0),
+                        endPoint: CGPoint(x: 0, y: size.height)
+                    )
+                )
+
+                // --- Line ---
+                var linePath = Path()
+                for (i, price) in history.enumerated() {
+                    let pt = CGPoint(x: xPos(i), y: yPos(price))
+                    if i == 0 { linePath.move(to: pt) }
+                    else { linePath.addLine(to: pt) }
+                }
+                context.stroke(
+                    linePath,
+                    with: .color(color),
+                    style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round)
+                )
             }
-            .chartXAxis(.hidden)
-            .chartYAxis(.hidden)
-            .chartYScale(domain: priceRange.min...priceRange.max)
-            .chartXScale(domain: 0...39)
-            .transaction { $0.animation = nil } // 完全停止任何 Chart 內部的補間動畫
         }
     }
 }
+

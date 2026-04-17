@@ -46,3 +46,4 @@ BackupOldSources/
 ## Snapshot Testing
 # 參考圖務必提交到 Git，讓所有裝置和 CI 使用同一份標準
 # __Snapshots__ 資料夾不應被 ignore
+.teamid
