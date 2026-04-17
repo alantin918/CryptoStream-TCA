@@ -13,13 +13,14 @@
 
 | Feature | Description |
 |---|---|
-| 📈 **Real-time Sparklines** | Live price charts powered by SwiftUI Charts, updating at 10Hz with ultra-zoom auto-scaling |
+| 📉 **Historical MA Charts** | Professional details view with 1H/1D/1W/1M timeframe selection and MA(7, 25, 99) overlays |
+| 📊 **Zero-Jitter Canvas UI** | Custom `Canvas`-based sparklines and historical charts that eliminate SwiftUI implicit animation lag and layout shifts |
 | ⚡ **WebSocket Streaming** | Connects to Binance public WebSocket API for BTC, ETH, SOL, BNB & DOGE |
 | 🧵 **Swift 6 Concurrency** | `PriceActor` enforces thread-safe state with timestamp-based out-of-order rejection |
 | 🎚️ **10Hz Throttling** | Per-symbol throttle gate prevents UI overload without dropping data integrity |
 | 🔄 **Auto-Reconnect** | Detects foreground/background transitions via `scenePhase` and reconnects automatically |
-| 💎 **Glassmorphism UI** | Dark mode, `.ultraThinMaterial` cards, animated ambient light blobs, and price pulse effects |
-| 🧪 **12 Test Cases** | Unit, integration, and concurrency stress tests covering the full data pipeline |
+| 💎 **Glassmorphism UI** | Dark mode, `.ultraThinMaterial` cards, monospaced digits, and ambient light blobs |
+| 🧪 **13 Test Cases** | Unit, integration, and concurrency stress tests covering the full data pipeline and chart state transitions |
 
 ---
 
@@ -76,12 +77,23 @@ Binance WSS → WebSocketClient → CryptoReducer → PriceActor (10Hz gate) →
 
 ### Installation
 
+1. Clone the repository:
 ```bash
 git clone https://github.com/alantin918/CryptoStream-TCA.git
 cd CryptoStream-TCA
-open CryptoApp.xcodeproj
 ```
 
+2. Setup Apple Development Team ID (prevents re-selection on every git pull):
+```bash
+echo "YOUR_TEAM_ID" > .teamid
+```
+
+3. Generate the Xcode project:
+```bash
+ruby generate.rb
+```
+
+4. Open the generated `CryptoApp.xcodeproj`
 > Xcode will automatically resolve the Swift Package dependencies on first open.
 
 ### Running the App
@@ -112,7 +124,7 @@ xcodebuild test \
 |---|---|
 | Language | Swift 6 (strict concurrency) |
 | Architecture | The Composable Architecture (TCA 1.17+) |
-| UI | SwiftUI + Charts framework |
+| UI | SwiftUI + custom `Canvas` drawing |
 | Concurrency | Swift Actor, AsyncThrowingStream |
 | Networking | URLSessionWebSocketTask |
 | Testing | XCTest, TCA TestStore |
