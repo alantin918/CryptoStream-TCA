@@ -126,8 +126,6 @@ private struct HeaderView: View {
 private struct CoinCardView: View {
     let coin: CryptoReducer.CoinState
     
-    @State private var isPulsing = false
-    
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
@@ -150,9 +148,7 @@ private struct CoinCardView: View {
                 Spacer()
                 
                 // Indicators
-                if coin.currentPrice != nil {
-                    CapsuleIndicator(color: coin.priceColor)
-                }
+                CapsuleIndicator(color: coin.currentPrice != nil ? coin.priceColor : .gray)
             }
             
             HStack(alignment: .bottom) {
@@ -162,8 +158,8 @@ private struct CoinCardView: View {
                         Text(price, format: .currency(code: "USD").presentation(.narrow))
                             .font(.system(size: 32, weight: .black, design: .rounded))
                             .foregroundColor(.white)
-                            .shadow(color: coin.priceColor.opacity(isPulsing ? 1.0 : 0), radius: 10)
-                            .animation(.spring(response: 0.2, dampingFraction: 0.6), value: price)
+                            // 只用 shadow 做視覺提示，不影響佈局
+                            .shadow(color: coin.priceColor.opacity(0.6), radius: 8)
                     } else {
                         Text("---.---")
                             .font(.system(size: 32, weight: .black, design: .rounded))
@@ -192,21 +188,6 @@ private struct CoinCardView: View {
                     endPoint: .bottomTrailing
                 ), lineWidth: 1)
         )
-        .scaleEffect(isPulsing ? 1.02 : 1.0)
-        .onChange(of: coin.currentPrice) { _ in
-            triggerPulse()
-        }
-    }
-    
-    private func triggerPulse() {
-        withAnimation(.easeOut(duration: 0.1)) {
-            isPulsing = true
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            withAnimation(.easeIn(duration: 0.3)) {
-                isPulsing = false
-            }
-        }
     }
 }
 
@@ -295,7 +276,6 @@ private struct HeaderStatusIndicator: View {
 
 private struct CoinDetailView: View {
     let coin: CryptoReducer.CoinState
-    @State private var isPulsing = false
     
     var body: some View {
         ZStack {
@@ -337,8 +317,7 @@ private struct CoinDetailView: View {
                             Text(String(format: "$%.2f", coin.currentPrice ?? 0))
                                 .font(.system(size: 50, weight: .black, design: .rounded))
                                 .foregroundColor(.white)
-                                .shadow(color: coin.priceColor.opacity(isPulsing ? 1.0 : 0.0), radius: 15)
-                                .animation(.spring(response: 0.2, dampingFraction: 0.6), value: coin.currentPrice)
+                                .shadow(color: coin.priceColor.opacity(0.6), radius: 12)
                             Spacer()
                         }
                     }
@@ -377,16 +356,6 @@ private struct CoinDetailView: View {
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
-        .onChange(of: coin.currentPrice) { _ in
-            withAnimation(.easeOut(duration: 0.1)) {
-                isPulsing = true
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                withAnimation(.easeIn(duration: 0.3)) {
-                    isPulsing = false
-                }
-            }
-        }
     }
 }
 
@@ -416,30 +385,19 @@ private struct RealtimeSparkline: View {
     let history: [Double]
     let color: Color
 
-    // Skeleton wave phase
-    @State private var wavePhase: Double = 0
-
     var body: some View {
         if history.isEmpty {
-            // Skeleton Loader: Animated Sine Wave (Charts can be used here since no real data)
-            Chart {
-                ForEach(0..<40, id: \.self) { index in
-                    LineMark(
-                        x: .value("Index", index),
-                        y: .value("Price", sin(Double(index) * 0.3 + wavePhase))
-                    )
-                    .foregroundStyle(Color.white.opacity(0.12))
-                    .lineStyle(StrokeStyle(lineWidth: 1.5, lineCap: .round))
-                }
-            }
-            .chartXAxis(.hidden)
-            .chartYAxis(.hidden)
-            .chartYScale(domain: -1.5...1.5)
-            .chartXScale(domain: 0...39)
-            .onAppear {
-                withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
-                    wavePhase -= .pi * 2
-                }
+            // 靜態虛線佔位符，完全無動畫，不影響佈局
+            Canvas { context, size in
+                var dashPath = Path()
+                let y = size.height / 2
+                dashPath.move(to: CGPoint(x: 0, y: y))
+                dashPath.addLine(to: CGPoint(x: size.width, y: y))
+                context.stroke(
+                    dashPath,
+                    with: .color(Color.white.opacity(0.15)),
+                    style: StrokeStyle(lineWidth: 1, dash: [4, 4])
+                )
             }
         } else {
             // Canvas-based drawing: no SwiftUI Charts, no implicit transitions, no floating
