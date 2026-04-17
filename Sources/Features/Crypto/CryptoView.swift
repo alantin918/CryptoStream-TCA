@@ -423,24 +423,32 @@ private struct RealtimeSparkline: View {
         return (min: min - (delta * 0.05), max: max + (delta * 0.05))
     }
     
+    private var chartData: [(index: Int, price: Double)] {
+        if history.isEmpty { return [] }
+        if history.count == 1 {
+            return [(index: 0, price: history[0]), (index: 1, price: history[0])]
+        }
+        return history.enumerated().map { (index: $0.offset, price: $0.element) }
+    }
+    
     var body: some View {
         if history.isEmpty {
             Rectangle()
                 .fill(Color.white.opacity(0.05))
         } else {
             Chart {
-                ForEach(Array(history.enumerated()), id: \.offset) { index, price in
+                ForEach(chartData, id: \.index) { item in
                     LineMark(
-                        x: .value("Index", index),
-                        y: .value("Price", price)
+                        x: .value("Index", item.index),
+                        y: .value("Price", item.price)
                     )
                     .foregroundStyle(color)
                     .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
                     
                     AreaMark(
-                        x: .value("Index", index),
+                        x: .value("Index", item.index),
                         yStart: .value("Min", priceRange.min),
-                        yEnd: .value("Price", price)
+                        yEnd: .value("Price", item.price)
                     )
                     .foregroundStyle(
                         LinearGradient(
