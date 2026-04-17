@@ -25,27 +25,27 @@ public actor PriceActor {
 
     /// Processes a single tick, returning the tick if it passes both the
     /// out-of-order guard and the throttle gate. Otherwise returns nil.
-    public func process(next tick: PriceTick) -> PriceTick? {
+    public func process(next tick: KlineTick) -> KlineTick? {
         let symbol = tick.symbol
 
         // MARK: 1. Out-of-Order Guard (per symbol)
         // Drop any tick whose timestamp is not newer than the last processed one.
         let lastTimestamp = lastProcessedTimestamps[symbol, default: -1]
-        guard tick.timestamp > lastTimestamp else {
+        guard tick.eventTime > lastTimestamp else {
             return nil
         }
-        lastProcessedTimestamps[symbol] = tick.timestamp
+        lastProcessedTimestamps[symbol] = tick.eventTime
 
         // MARK: 2. Timestamp-Based Throttle Gate (per symbol)
         // Use the tick's own timestamp so the result is deterministic
         // regardless of real wall-clock execution speed (critical for CI stability).
         if let lastAccepted = lastAcceptedTimestamps[symbol] {
-            if tick.timestamp - lastAccepted < minInterval {
+            if tick.eventTime - lastAccepted < minInterval {
                 return nil // Too soon — throttle this update
             }
         }
 
-        lastAcceptedTimestamps[symbol] = tick.timestamp
+        lastAcceptedTimestamps[symbol] = tick.eventTime
         return tick
     }
 }

@@ -5,7 +5,7 @@ import ComposableArchitecture
 @MainActor
 final class CryptoReducerTests: XCTestCase {
     
-    func testReceivePriceDeltaColoring() async {
+    func testReceiveKlineDeltaColoring() async {
         let testDate = Date(timeIntervalSince1970: 1234567890)
         let store = TestStore(initialState: CryptoReducer.State()) {
             CryptoReducer()
@@ -13,33 +13,33 @@ final class CryptoReducerTests: XCTestCase {
             $0.date.now = testDate
         }
         
-        let btcPrice = PriceTick(symbol: "btcusdt", price: 50000.0, timestamp: 1000)
+        let btcKline1 = KlineTick(symbol: "btcusdt", open: 50000.0, high: 50500.0, low: 49500.0, close: 50000.0, eventTime: 1000, openTime: 1000, isClosed: false)
         
-        // 1. Receive BTC Price
-        await store.send(.receivePrice(btcPrice)) {
+        // 1. Receive BTC Kline (Open = Close -> Color should be green as close >= open)
+        await store.send(.receiveKline(btcKline1)) {
             $0.coins[id: "btcusdt"]?.currentPrice = 50000.0
-            $0.coins[id: "btcusdt"]?.priceColor = .primary
+            $0.coins[id: "btcusdt"]?.priceColor = .green
             $0.coins[id: "btcusdt"]?.lastUpdate = testDate
-            $0.coins[id: "btcusdt"]?.priceHistory = [50000.0]
+            $0.coins[id: "btcusdt"]?.klineHistory = [btcKline1]
         }
         
-        // 2. BTC Price goes up
-        let higherBtc = PriceTick(symbol: "btcusdt", price: 50100.0, timestamp: 1001)
-        await store.send(.receivePrice(higherBtc)) {
+        // 2. BTC Kline updates within same minute (Price goes up)
+        let higherBtc = KlineTick(symbol: "btcusdt", open: 50000.0, high: 50500.0, low: 49500.0, close: 50100.0, eventTime: 1001, openTime: 1000, isClosed: false)
+        await store.send(.receiveKline(higherBtc)) {
             $0.coins[id: "btcusdt"]?.lastPrice = 50000.0
             $0.coins[id: "btcusdt"]?.currentPrice = 50100.0
             $0.coins[id: "btcusdt"]?.priceColor = .green
             $0.coins[id: "btcusdt"]?.lastUpdate = testDate
-            $0.coins[id: "btcusdt"]?.priceHistory = [50000.0, 50100.0]
+            $0.coins[id: "btcusdt"]?.klineHistory = [higherBtc] // Replaces previous
         }
         
-        // 3. Receive ETH Price independently
-        let ethPrice = PriceTick(symbol: "ethusdt", price: 2500.0, timestamp: 1000)
-        await store.send(.receivePrice(ethPrice)) {
+        // 3. Receive new ETH Kline (Price goes down: Open > Close)
+        let ethKline = KlineTick(symbol: "ethusdt", open: 2600.0, high: 2600.0, low: 2400.0, close: 2500.0, eventTime: 1000, openTime: 2000, isClosed: false)
+        await store.send(.receiveKline(ethKline)) {
             $0.coins[id: "ethusdt"]?.currentPrice = 2500.0
-            $0.coins[id: "ethusdt"]?.priceColor = .primary
+            $0.coins[id: "ethusdt"]?.priceColor = .red
             $0.coins[id: "ethusdt"]?.lastUpdate = testDate
-            $0.coins[id: "ethusdt"]?.priceHistory = [2500.0]
+            $0.coins[id: "ethusdt"]?.klineHistory = [ethKline]
         }
     }
     
@@ -66,25 +66,54 @@ final class CryptoReducerTests: XCTestCase {
             $0.connectivityStatus = .connected
         }
         
-        // Mock Enveloped Binance Message
+        // Mock Enveloped Binance Kline Message
         let jsonString = """
         {
-          "stream": "btcusdt@trade",
+          "stream": "btcusdt@kline_1m",
           "data": {
-            "e": "trade",
+            "e": "kline",
             "E": 1672515782136,
             "s": "BTCUSDT",
-            "p": "65000.00"
+            "k": {
+              "t": 1672515780000,
+              "T": 1672515839999,
+              "s": "BTCUSDT",
+              "i": "1m",
+              "f": 100,
+              "L": 200,
+              "o": "64000.00",
+              "c": "65000.00",
+              "h": "66000.00",
+              "l": "63000.00",
+              "v": "1000",
+              "n": 100,
+              "x": false,
+              "q": "1.0000",
+              "V": "500",
+              "Q": "0.500",
+              "B": "123456"
+            }
           }
         }
         """
         continuation.yield(.string(jsonString))
         
-        let expectedPrice = PriceTick(symbol: "btcusdt", price: 65000.0, timestamp: 1672515782136)
-        await store.receive(.receivePrice(expectedPrice)) {
+        let expectedKline = KlineTick(
+            symbol: "btcusdt",
+            open: 64000.0,
+            high: 66000.0,
+            low: 63000.0,
+            close: 65000.0,
+            eventTime: 1672515782136,
+            openTime: 1672515780000,
+            isClosed: false
+        )
+        
+        await store.receive(.receiveKline(expectedKline)) {
             $0.coins[id: "btcusdt"]?.currentPrice = 65000.0
+            $0.coins[id: "btcusdt"]?.priceColor = .green
             $0.coins[id: "btcusdt"]?.lastUpdate = testDate
-            $0.coins[id: "btcusdt"]?.priceHistory = [65000.0]
+            $0.coins[id: "btcusdt"]?.klineHistory = [expectedKline]
         }
         
         await store.send(.onDisappear) {
@@ -100,24 +129,20 @@ final class CryptoReducerTests: XCTestCase {
         let store = TestStore(initialState: CryptoReducer.State()) {
             CryptoReducer()
         } withDependencies: {
-            // 模擬連線後立即拋出錯誤
             $0.webSocketClient.connect = { (_: URL) in
                 throw URLError(.notConnectedToInternet)
             }
             $0.webSocketClient.disconnect = {}
         }
         
-        // 動作：嘗試開始連線
         await store.send(.onAppear) {
             $0.connectivityStatus = .connecting
         }
         
-        // 驗證：由於邏輯順序，會先設為 connected
         await store.receive(.updateStatus(.connected)) {
             $0.connectivityStatus = .connected
         }
         
-        // 驗證：隨後拋出錯誤，切換為 disconnected
         await store.receive(.updateStatus(.disconnected)) {
             $0.connectivityStatus = .disconnected
         }
@@ -130,14 +155,9 @@ final class CryptoReducerTests: XCTestCase {
             CryptoReducer()
         }
         
-        // 傳來一個不在預設清單 (BTC, ETH, SOL, BNB, DOGE) 中的幣種
-        let unknownPrice = PriceTick(symbol: "SHIBUSDT", price: 0.00001, timestamp: 1000)
+        let unknownKline = KlineTick(symbol: "SHIBUSDT", open: 0.1, high: 0.2, low: 0.1, close: 0.15, eventTime: 1000, openTime: 1000, isClosed: false)
         
-        // 動作：接收到未知幣種
-        await store.send(.receivePrice(unknownPrice))
-        
-        // 驗證：State 應該沒有任何改變（因為 guard 會擋掉）
-        // 如果 State 發生任何變動，TestStore 會報錯
+        await store.send(.receiveKline(unknownKline))
     }
 }
 
@@ -146,23 +166,19 @@ final class PriceActorTests: XCTestCase {
     // MARK: - 5. 測試節流速率 (Throttling Rate Limit)
     
     func testThrottlingRateLimit() async {
-        // 設定 10Hz = 每 100ms 只能通關一筆 (minInterval = 100ms)
         let actor = PriceActor(updatesPerSecond: 10)
         let symbol = "BTC"
 
-        let tick1 = PriceTick(symbol: symbol, price: 100.0, timestamp: 1000)
-        let tick2 = PriceTick(symbol: symbol, price: 101.0, timestamp: 1001)  // 1ms 後，太近
-        let tick3 = PriceTick(symbol: symbol, price: 102.0, timestamp: 1101)  // 101ms 後，應過關
+        let tick1 = KlineTick(symbol: symbol, open: 1, high: 1, low: 1, close: 100.0, eventTime: 1000, openTime: 1000, isClosed: false)
+        let tick2 = KlineTick(symbol: symbol, open: 1, high: 1, low: 1, close: 101.0, eventTime: 1001, openTime: 1000, isClosed: false)  // 1ms 後，太近
+        let tick3 = KlineTick(symbol: symbol, open: 1, high: 1, low: 1, close: 102.0, eventTime: 1101, openTime: 1000, isClosed: false)  // 101ms 後，應過關
 
-        // 第一筆：必過（無歷史記錄）
         var result = await actor.process(next: tick1)
         XCTAssertNotNil(result)
 
-        // 第二筆：只過了 1ms，應該被節流攔截
         result = await actor.process(next: tick2)
         XCTAssertNil(result, "間隔 1ms < 100ms，必須被節流攔截")
 
-        // 第三筆：timestamp 差距 101ms ≥ 100ms，應該過關（純 timestamp 判斷，無需真實等待）
         result = await actor.process(next: tick3)
         XCTAssertNotNil(result, "間隔 101ms ≥ 100ms，應允許通過")
     }
@@ -170,19 +186,16 @@ final class PriceActorTests: XCTestCase {
     func testMultiSymbolProcessing() async {
         let actor = PriceActor(updatesPerSecond: 1000)
         
-        let btc1 = PriceTick(symbol: "BTC", price: 100.0, timestamp: 1000)
-        let eth1 = PriceTick(symbol: "ETH", price: 50.0, timestamp: 1000)
-        let btcOld = PriceTick(symbol: "BTC", price: 90.0, timestamp: 999)
+        let btc1 = KlineTick(symbol: "BTC", open: 1, high: 1, low: 1, close: 100.0, eventTime: 1000, openTime: 1000, isClosed: false)
+        let eth1 = KlineTick(symbol: "ETH", open: 1, high: 1, low: 1, close: 50.0, eventTime: 1000, openTime: 1000, isClosed: false)
+        let btcOld = KlineTick(symbol: "BTC", open: 1, high: 1, low: 1, close: 90.0, eventTime: 999, openTime: 1000, isClosed: false)
         
-        // BTC 1 passes
         var result = await actor.process(next: btc1)
         XCTAssertEqual(result, btc1)
         
-        // ETH 1 passes (different symbol, independent)
         result = await actor.process(next: eth1)
         XCTAssertEqual(result, eth1)
         
-        // BTC Old is dropped
         result = await actor.process(next: btcOld)
         XCTAssertNil(result)
     }

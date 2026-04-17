@@ -2,7 +2,9 @@ import ComposableArchitecture
 import SwiftUI
 import Foundation
 
-public typealias CryptoPrice = PriceTick
+import ComposableArchitecture
+import SwiftUI
+import Foundation
 
 public struct CryptoReducer: Reducer, Sendable {
     public struct CoinState: Equatable, Identifiable {
@@ -12,7 +14,7 @@ public struct CryptoReducer: Reducer, Sendable {
         public var status: String = "Waiting..."
         public var priceColor: Color = .primary
         public var lastUpdate: Date = .distantPast
-        public var priceHistory: [Double] = []
+        public var klineHistory: [KlineTick] = [] // Keeps the last X candles
         
         public var symbolDisplayName: String {
             id.replacingOccurrences(of: "usdt", with: "").uppercased()
@@ -34,7 +36,7 @@ public struct CryptoReducer: Reducer, Sendable {
     public enum Action: Equatable {
         case onAppear
         case onDisappear
-        case receivePrice(PriceTick)
+        case receiveKline(KlineTick)
         case updateStatus(ConnectivityStatus)
     }
     
@@ -57,7 +59,8 @@ public struct CryptoReducer: Reducer, Sendable {
             state.connectivityStatus = .connecting
             
             let symbols = state.coins.map { $0.id }
-            let streams = symbols.map { "\($0)@trade" }.joined(separator: "/")
+            // Subscribe to 1m kline
+            let streams = symbols.map { "\($0)@kline_1m" }.joined(separator: "/")
             let url = URL(string: "wss://stream.binance.com:9443/stream?streams=\(streams)")!
             
             let client = webSocketClient
@@ -80,17 +83,28 @@ public struct CryptoReducer: Reducer, Sendable {
                     
                     guard let data = rawData else { continue }
                     
-                    if let envelope = try? JSONDecoder().decode(BinanceEnvelopeDTO.self, from: data) {
-                        let trade = envelope.data
-                        if let priceDouble = Double(trade.price) {
-                            let tick = PriceTick(
-                                symbol: trade.symbol.lowercased(),
-                                price: priceDouble,
-                                timestamp: trade.eventTime
+                    if let envelope = try? JSONDecoder().decode(BinanceKlineEnvelopeDTO.self, from: data) {
+                        let klineData = envelope.data
+                        let kline = klineData.kline
+                        
+                        if let open = Double(kline.openPrice),
+                           let high = Double(kline.highPrice),
+                           let low = Double(kline.lowPrice),
+                           let close = Double(kline.closePrice) {
+                            
+                            let tick = KlineTick(
+                                symbol: klineData.symbol.lowercased(),
+                                open: open,
+                                high: high,
+                                low: low,
+                                close: close,
+                                eventTime: klineData.eventTime,
+                                openTime: kline.openTime,
+                                isClosed: kline.isClosed
                             )
                             
                             if let validTick = await priceActor.process(next: tick) {
-                                await send(.receivePrice(validTick))
+                                await send(.receiveKline(validTick))
                             }
                         }
                     }
@@ -108,26 +122,28 @@ public struct CryptoReducer: Reducer, Sendable {
             }
             .cancellable(id: CancelID.webSocket)
 
-        case let .receivePrice(tick):
+        case let .receiveKline(tick):
             guard var coin = state.coins[id: tick.symbol] else { return .none }
             
             coin.lastPrice = coin.currentPrice
-            coin.currentPrice = tick.price
+            coin.currentPrice = tick.close
             coin.lastUpdate = self.date.now
             
-            // Update history (last 100 points for ~10 seconds of history at 10Hz)
-            coin.priceHistory.append(tick.price)
-            if coin.priceHistory.count > 100 {
-                coin.priceHistory.removeFirst()
-            }
-            
-            if let last = coin.lastPrice {
-                if tick.price > last {
-                    coin.priceColor = .green
-                } else if tick.price < last {
-                    coin.priceColor = .red
+            // Manage kline history
+            if let lastKline = coin.klineHistory.last, lastKline.openTime == tick.openTime {
+                // In the exact same minute candle, just replace it with the latest data
+                coin.klineHistory[coin.klineHistory.count - 1] = tick
+            } else {
+                // A new minute has started, append the new candle
+                coin.klineHistory.append(tick)
+                // Limit the number of candles displayed to fit the UI smoothly (e.g., last 20 mins)
+                if coin.klineHistory.count > 20 {
+                    coin.klineHistory.removeFirst()
                 }
             }
+            
+            // Color is based on the candle's open and close
+            coin.priceColor = tick.close >= tick.open ? .green : .red
             
             state.coins[id: tick.symbol] = coin
             return .none
@@ -141,19 +157,37 @@ public struct CryptoReducer: Reducer, Sendable {
 
 // MARK: - DTOs
 
-private struct BinanceEnvelopeDTO: Decodable {
+private struct BinanceKlineEnvelopeDTO: Decodable {
     let stream: String
-    let data: BinanceTradeDTO
+    let data: BinanceKlineDataDTO
 }
 
-private struct BinanceTradeDTO: Decodable {
-    let symbol: String
-    let price: String
+private struct BinanceKlineDataDTO: Decodable {
     let eventTime: Int64
+    let symbol: String
+    let kline: BinanceKlineTickDTO
     
     enum CodingKeys: String, CodingKey {
-        case symbol = "s"
-        case price = "p"
         case eventTime = "E"
+        case symbol = "s"
+        case kline = "k"
+    }
+}
+
+private struct BinanceKlineTickDTO: Decodable {
+    let openTime: Int64
+    let openPrice: String
+    let highPrice: String
+    let lowPrice: String
+    let closePrice: String
+    let isClosed: Bool
+    
+    enum CodingKeys: String, CodingKey {
+        case openTime = "t"
+        case openPrice = "o"
+        case highPrice = "h"
+        case lowPrice = "l"
+        case closePrice = "c"
+        case isClosed = "x"
     }
 }

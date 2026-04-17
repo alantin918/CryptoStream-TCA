@@ -158,8 +158,8 @@ private struct CoinCardView: View {
                 
                 Spacer()
                 
-                // Real-time Sparkline (using SwiftUI Charts)
-                RealtimeSparkline(history: coin.priceHistory, color: coin.priceColor)
+                // Candlesitck Chart (using SwiftUI Charts)
+                CandlestickChart(history: coin.klineHistory)
                     .frame(width: 100, height: 35)
             }
         }
@@ -234,27 +234,25 @@ private struct SymbolIcon: View {
     }
 }
 
-private struct RealtimeSparkline: View {
-    let history: [Double]
-    let color: Color
+private struct CandlestickChart: View {
+    let history: [KlineTick]
     
-    // 計算歷史數據的範圍，用於強迫 Y 軸極度縮放
+    // 計算歷史數據的高低範圍，用於 Y 軸極度縮放
     private var priceRange: (min: Double, max: Double) {
-        let min = history.min() ?? 0
-        let max = history.max() ?? 0
+        let min = history.map { $0.low }.min() ?? 0
+        let max = history.map { $0.high }.max() ?? 0
         
-        // 如果所有價格都一樣（平盤），給一個微小的上下邊距防止 Chart 崩潰
+        // 如果幾乎平盤
         if min == max {
             return (min: min * 0.9999, max: max * 1.0001)
         }
         
-        // 增加 5% 的上下緩衝空間，讓曲線不至於貼邊
         let delta = max - min
         return (min: min - (delta * 0.05), max: max + (delta * 0.05))
     }
     
     var body: some View {
-        if history.count < 2 {
+        if history.isEmpty {
             Rectangle()
                 .fill(Color.white.opacity(0.05))
                 .overlay(
@@ -264,36 +262,33 @@ private struct RealtimeSparkline: View {
                 )
         } else {
             Chart {
-                ForEach(Array(history.enumerated()), id: \.offset) { index, price in
-                    LineMark(
+                ForEach(Array(history.enumerated()), id: \.offset) { index, kline in
+                    // Wicks (High to Low Shadow)
+                    RuleMark(
                         x: .value("Index", index),
-                        y: .value("Price", price)
+                        yStart: .value("Low", kline.low),
+                        yEnd: .value("High", kline.high)
                     )
-                    .foregroundStyle(color)
-                    .interpolationMethod(.monotone)
-                    .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+                    .foregroundStyle(kline.close >= kline.open ? Color.green : Color.red)
+                    .lineStyle(StrokeStyle(lineWidth: 1.5))
                     
-                    AreaMark(
+                    // Real Body (Open to Close)
+                    RectangleMark(
                         x: .value("Index", index),
-                        y: .value("Price", price)
+                        yStart: .value("Open", kline.open),
+                        yEnd: .value("Close", kline.close),
+                        width: .fixed(4) // 調整寬度以適應 100pt x 20 根
                     )
-                    .foregroundStyle(
-                        LinearGradient(
-                            gradient: Gradient(colors: [color.opacity(0.2), color.opacity(0.0)]),
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .interpolationMethod(.monotone)
+                    .foregroundStyle(kline.close >= kline.open ? Color.green : Color.red)
                 }
             }
             .chartXAxis(.hidden)
             .chartYAxis(.hidden)
-            // 強制設定 Y 軸範圍，實現極度縮放
+            // 強制設定 Y 軸範圍
             .chartYScale(domain: priceRange.min...priceRange.max)
             .chartXScale(domain: .automatic(includesZero: false))
-            .animation(.easeInOut(duration: 0.3), value: history)
-            .clipped() // 防止 AreaMark 漸層渲染超出卡片邊界
+            .animation(.easeInOut(duration: 0.1), value: history.last?.close ?? 0)
+            .clipped() // 防止繪製區域超出 frame
         }
     }
 }

@@ -18,14 +18,14 @@ final class PriceActorConcurrencyTests: XCTestCase {
         let symbol = "btcusdt"
 
         // 使用 TaskGroup 真正並發地打出 100 筆請求
-        let results = await withTaskGroup(of: PriceTick?.self) { group in
+        let results = await withTaskGroup(of: KlineTick?.self) { group in
             for i in 0..<100 {
                 group.addTask {
-                    let tick = PriceTick(symbol: symbol, price: Double(50000 + i), timestamp: Int64(1000 + i))
+                    let tick = KlineTick(symbol: symbol, open: 1, high: 1, low: 1, close: Double(50000 + i), eventTime: Int64(1000 + i), openTime: 1000, isClosed: false)
                     return await actor.process(next: tick)
                 }
             }
-            var passed: [PriceTick] = []
+            var passed: [KlineTick] = []
             for await result in group {
                 if let tick = result { passed.append(tick) }
             }
@@ -46,7 +46,7 @@ final class PriceActorConcurrencyTests: XCTestCase {
         var passCount = 0
 
         for i in 0..<15 {
-            let tick = PriceTick(symbol: symbol, price: Double(100 + i), timestamp: Int64(1000 + i * 10))
+            let tick = KlineTick(symbol: symbol, open: 1, high: 1, low: 1, close: Double(100 + i), eventTime: Int64(1000 + i * 10), openTime: 1000, isClosed: false)
             if await actor.process(next: tick) != nil {
                 passCount += 1
             }
@@ -66,27 +66,27 @@ final class PriceActorConcurrencyTests: XCTestCase {
         let actor = PriceActor(updatesPerSecond: 10)
 
         // BTC - 第一筆通過
-        let btc1 = PriceTick(symbol: "btcusdt", price: 65000, timestamp: 1000)
+        let btc1 = KlineTick(symbol: "btcusdt", open: 1, high: 1, low: 1, close: 65000, eventTime: 1000, openTime: 1000, isClosed: false)
         let btc1Result = await actor.process(next: btc1)
         XCTAssertNotNil(btc1Result, "BTC 第一筆必須通過")
 
         // BTC - 第二筆被節流（間隔 0ms）
-        let btc2 = PriceTick(symbol: "btcusdt", price: 65001, timestamp: 1001)
+        let btc2 = KlineTick(symbol: "btcusdt", open: 1, high: 1, low: 1, close: 65001, eventTime: 1001, openTime: 1000, isClosed: false)
         let btc2Result = await actor.process(next: btc2)
         XCTAssertNil(btc2Result, "BTC 第二筆必須被節流")
 
         // ETH - 雖然 BTC 被節流了，ETH 的第一筆仍應通過（獨立狀態）
-        let eth1 = PriceTick(symbol: "ethusdt", price: 3200, timestamp: 1000)
+        let eth1 = KlineTick(symbol: "ethusdt", open: 1, high: 1, low: 1, close: 3200, eventTime: 1000, openTime: 1000, isClosed: false)
         let eth1Result = await actor.process(next: eth1)
         XCTAssertNotNil(eth1Result, "ETH 第一筆應通過，不受 BTC 節流影響")
 
         // SOL - 同樣獨立通過
-        let sol1 = PriceTick(symbol: "solusdt", price: 145, timestamp: 1000)
+        let sol1 = KlineTick(symbol: "solusdt", open: 1, high: 1, low: 1, close: 145, eventTime: 1000, openTime: 1000, isClosed: false)
         let sol1Result = await actor.process(next: sol1)
         XCTAssertNotNil(sol1Result, "SOL 第一筆應通過，不受其他幣種影響")
 
         // ETH - 第二筆被節流（ETH 自己的間隔）
-        let eth2 = PriceTick(symbol: "ethusdt", price: 3201, timestamp: 1002)
+        let eth2 = KlineTick(symbol: "ethusdt", open: 1, high: 1, low: 1, close: 3201, eventTime: 1002, openTime: 1000, isClosed: false)
         let eth2Result = await actor.process(next: eth2)
         XCTAssertNil(eth2Result, "ETH 第二筆必須被節流")
     }
@@ -97,15 +97,15 @@ final class PriceActorConcurrencyTests: XCTestCase {
         let actor = PriceActor(updatesPerSecond: 1000) // 取消節流，專注測試亂序過濾
         let symbol = "bnbusdt"
 
-        // 先建立一個時間戳基準：timestamp = 5000
-        let baseTick = PriceTick(symbol: symbol, price: 600, timestamp: 5000)
+        // 先建立一個時間戳基準：eventTime = 5000
+        let baseTick = KlineTick(symbol: symbol, open: 1, high: 1, low: 1, close: 600, eventTime: 5000, openTime: 1000, isClosed: false)
         let baseResult = await actor.process(next: baseTick)
         XCTAssertNotNil(baseResult)
 
-        // 送入 50 筆舊時間戳（全部 < 5000），全部應被過濾
+        // 送入 50 筆舊時間戳（全部 eventTime < 5000），全部應被過濾
         var rejectedCount = 0
         for i in 0..<50 {
-            let oldTick = PriceTick(symbol: symbol, price: Double(600 + i), timestamp: Int64(4999 - i))
+            let oldTick = KlineTick(symbol: symbol, open: 1, high: 1, low: 1, close: Double(600 + i), eventTime: Int64(4999 - i), openTime: 1000, isClosed: false)
             if await actor.process(next: oldTick) == nil {
                 rejectedCount += 1
             }
@@ -156,24 +156,43 @@ final class CryptoIntegrationTests: XCTestCase {
         for (i, price) in btcMessages.enumerated() {
             let json = """
             {
-                "stream": "btcusdt@trade",
-                "data": {
-                    "e": "trade",
-                    "E": \(1000 + i),
-                    "s": "BTCUSDT",
-                    "p": "\(price)"
+              "stream": "btcusdt@kline_1m",
+              "data": {
+                "e": "kline",
+                "E": \(1000 + i),
+                "s": "BTCUSDT",
+                "k": {
+                  "t": 1000,
+                  "T": 1599,
+                  "s": "BTCUSDT",
+                  "i": "1m",
+                  "f": 100,
+                  "L": 200,
+                  "o": "64000.00",
+                  "c": "\(price)",
+                  "h": "66000.00",
+                  "l": "63000.00",
+                  "v": "1000",
+                  "n": 100,
+                  "x": false,
+                  "q": "1.0000",
+                  "V": "500",
+                  "Q": "0.500",
+                  "B": "123456"
                 }
+              }
             }
             """
             continuation.yield(.string(json))
         }
 
         // 驗證：只有第一筆 BTC (65000) 應抵達 Reducer
-        let expectedFirstTick = PriceTick(symbol: "btcusdt", price: 65000.0, timestamp: 1000)
-        await store.receive(.receivePrice(expectedFirstTick), timeout: .seconds(2)) {
+        let expectedFirstTick = KlineTick(symbol: "btcusdt", open: 64000.0, high: 66000.0, low: 63000.0, close: 65000.0, eventTime: 1000, openTime: 1000, isClosed: false)
+        await store.receive(.receiveKline(expectedFirstTick), timeout: .seconds(2)) {
             $0.coins[id: "btcusdt"]?.currentPrice = 65000.0
+            $0.coins[id: "btcusdt"]?.priceColor = .green
             $0.coins[id: "btcusdt"]?.lastUpdate = testDate
-            $0.coins[id: "btcusdt"]?.priceHistory = [65000.0]
+            $0.coins[id: "btcusdt"]?.klineHistory = [expectedFirstTick]
         }
 
         // 清理
@@ -211,13 +230,13 @@ final class CryptoIntegrationTests: XCTestCase {
             "this is not json at all",
             "{ \"broken\": }",
             "",
-            "{ \"stream\": \"btcusdt@trade\" }" // 缺少 data 欄位
+            "{ \"stream\": \"btcusdt@kline_1m\" }" // 缺少 data 欄位
         ]
         for msg in badMessages {
             continuation.yield(.string(msg))
         }
 
-        // 等待一小段時間讓 stream 處理，不應收到任何 receivePrice action
+        // 等待一小段時間讓 stream 處理，不應收到任何 receiveKline action
         try? await Task.sleep(for: .milliseconds(100))
 
         // 清理 - State 必須完全不變
