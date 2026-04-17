@@ -462,7 +462,7 @@ private struct RealtimeSparkline: View {
             .chartXAxis(.hidden)
             .chartYAxis(.hidden)
             .chartYScale(domain: priceRange.min...priceRange.max)
-            .chartXScale(domain: .automatic(includesZero: false))
+            .chartXScale(domain: 0...39) // Fixed domain to create left-to-right growth effect
             .animation(.easeInOut(duration: 0.1), value: history.last ?? 0)
         }
     }
