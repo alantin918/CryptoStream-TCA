@@ -50,9 +50,10 @@ public struct CryptoView: View {
                                         CoinCardView(coin: coin)
                                     }
                                     .buttonStyle(.plain)
-                                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                                    // 不加 transition，避免每次資料更新時觸發從下往上的滑入動畫
                                 }
                             }
+                            .animation(nil, value: viewStore.coins) // 資料更新時不做列表動畫
                             .padding(.horizontal, 20)
                             .padding(.top, 10)
                             .padding(.bottom, 30)
