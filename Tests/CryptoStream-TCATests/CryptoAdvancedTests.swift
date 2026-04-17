@@ -193,6 +193,7 @@ final class CryptoIntegrationTests: XCTestCase {
             $0.coins[id: "btcusdt"]?.priceColor = .green
             $0.coins[id: "btcusdt"]?.lastUpdate = testDate
             $0.coins[id: "btcusdt"]?.klineHistory = [expectedFirstTick]
+            $0.coins[id: "btcusdt"]?.sparklineBuffer = [expectedFirstTick.close]
         }
 
         // 清理

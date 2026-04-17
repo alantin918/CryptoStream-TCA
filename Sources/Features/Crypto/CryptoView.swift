@@ -173,7 +173,7 @@ private struct CoinCardView: View {
                 Spacer()
                 
                 // Sparkline Chart for list view
-                RealtimeSparkline(history: coin.klineHistory.map(\.close), color: coin.priceColor)
+                RealtimeSparkline(history: coin.sparklineBuffer, color: coin.priceColor)
                     .frame(width: 100, height: 35)
             }
         }
@@ -361,7 +361,7 @@ private struct CoinDetailView: View {
                             .foregroundColor(.white.opacity(0.6))
                             .padding(.horizontal, 24)
                         
-                        RealtimeSparkline(history: coin.klineHistory.map(\.close), color: coin.priceColor)
+                        RealtimeSparkline(history: coin.sparklineBuffer, color: coin.priceColor)
                             .frame(height: 250)
                             .padding()
                             .background(Color.white.opacity(0.02))

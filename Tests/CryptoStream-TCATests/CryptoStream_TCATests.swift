@@ -21,6 +21,7 @@ final class CryptoReducerTests: XCTestCase {
             $0.coins[id: "btcusdt"]?.priceColor = .green
             $0.coins[id: "btcusdt"]?.lastUpdate = testDate
             $0.coins[id: "btcusdt"]?.klineHistory = [btcKline1]
+            $0.coins[id: "btcusdt"]?.sparklineBuffer = [btcKline1.close]
         }
         
         // 2. BTC Kline updates within same minute (Price goes up)
@@ -31,6 +32,7 @@ final class CryptoReducerTests: XCTestCase {
             $0.coins[id: "btcusdt"]?.priceColor = .green
             $0.coins[id: "btcusdt"]?.lastUpdate = testDate
             $0.coins[id: "btcusdt"]?.klineHistory = [higherBtc] // Replaces previous
+            $0.coins[id: "btcusdt"]?.sparklineBuffer = [btcKline1.close, higherBtc.close]
         }
         
         // 3. Receive new ETH Kline (Price goes down: Open > Close)
@@ -40,6 +42,7 @@ final class CryptoReducerTests: XCTestCase {
             $0.coins[id: "ethusdt"]?.priceColor = .red
             $0.coins[id: "ethusdt"]?.lastUpdate = testDate
             $0.coins[id: "ethusdt"]?.klineHistory = [ethKline]
+            $0.coins[id: "ethusdt"]?.sparklineBuffer = [ethKline.close]
         }
     }
     
@@ -114,6 +117,7 @@ final class CryptoReducerTests: XCTestCase {
             $0.coins[id: "btcusdt"]?.priceColor = .green
             $0.coins[id: "btcusdt"]?.lastUpdate = testDate
             $0.coins[id: "btcusdt"]?.klineHistory = [expectedKline]
+            $0.coins[id: "btcusdt"]?.sparklineBuffer = [expectedKline.close]
         }
         
         await store.send(.onDisappear) {

@@ -15,6 +15,7 @@ public struct CryptoReducer: Reducer, Sendable {
         public var priceColor: Color = .primary
         public var lastUpdate: Date = .distantPast
         public var klineHistory: [KlineTick] = [] // Keeps the last X candles
+        public var sparklineBuffer: [Double] = [] // Keeps high-frequency ticks for smooth jitter
         
         public var symbolDisplayName: String {
             id.replacingOccurrences(of: "usdt", with: "").uppercased()
@@ -140,6 +141,12 @@ public struct CryptoReducer: Reducer, Sendable {
                 if coin.klineHistory.count > 60 {
                     coin.klineHistory.removeFirst()
                 }
+            }
+            
+            // Manage high-frequency sparkline buffer for real-time jitter effect
+            coin.sparklineBuffer.append(tick.close)
+            if coin.sparklineBuffer.count > 40 {
+                coin.sparklineBuffer.removeFirst()
             }
             
             // Color is based on the candle's open and close
