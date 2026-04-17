@@ -415,6 +415,8 @@ private struct RealtimeSparkline: View {
     let history: [Double]
     let color: Color
     
+    @State private var wavePhase: Double = 0
+    
     private var priceRange: (min: Double, max: Double) {
         let min = history.min() ?? 0
         let max = history.max() ?? 0
@@ -433,8 +435,39 @@ private struct RealtimeSparkline: View {
     
     var body: some View {
         if history.isEmpty {
-            Rectangle()
-                .fill(Color.white.opacity(0.05))
+            // Skeleton Loader: Animated Sine Wave
+            Chart {
+                ForEach(0..<40, id: \.self) { index in
+                    LineMark(
+                        x: .value("Index", index),
+                        y: .value("Price", sin(Double(index) * 0.3 + wavePhase))
+                    )
+                    .foregroundStyle(Color.white.opacity(0.1))
+                    .lineStyle(StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
+                    
+                    AreaMark(
+                        x: .value("Index", index),
+                        yStart: .value("Min", -1.5),
+                        yEnd: .value("Price", sin(Double(index) * 0.3 + wavePhase))
+                    )
+                    .foregroundStyle(
+                        LinearGradient(
+                            gradient: Gradient(colors: [Color.white.opacity(0.05), Color.clear]),
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                }
+            }
+            .chartXAxis(.hidden)
+            .chartYAxis(.hidden)
+            .chartYScale(domain: -1.5...1.5)
+            .chartXScale(domain: 0...39)
+            .onAppear {
+                withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
+                    wavePhase -= .pi * 2
+                }
+            }
         } else {
             Chart {
                 ForEach(chartData, id: \.index) { item in
