@@ -156,8 +156,10 @@ private struct CoinCardView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     if let price = coin.currentPrice {
                         Text(price, format: .currency(code: "USD").presentation(.narrow))
-                            .font(.system(size: 32, weight: .black, design: .rounded))
+                            .font(.system(size: 28, weight: .black, design: .rounded).monospacedDigit())
                             .foregroundColor(.white)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
                             // 只用 shadow 做視覺提示，不影響佈局
                             .shadow(color: coin.priceColor.opacity(0.6), radius: 8)
                     } else {
@@ -315,8 +317,10 @@ private struct CoinDetailView: View {
                         
                         HStack {
                             Text(String(format: "$%.2f", coin.currentPrice ?? 0))
-                                .font(.system(size: 50, weight: .black, design: .rounded))
+                                .font(.system(size: 44, weight: .black, design: .rounded).monospacedDigit())
                                 .foregroundColor(.white)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.5)
                                 .shadow(color: coin.priceColor.opacity(0.6), radius: 12)
                             Spacer()
                         }
