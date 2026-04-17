@@ -484,14 +484,14 @@ private struct RealtimeSparkline: View {
                     .foregroundStyle(color)
                     .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
                     
+                    // 使用 y: 而非 yStart/yEnd，避免 yStart 隨 priceRange.min 改變時觸發上浮補間動畫
                     AreaMark(
                         x: .value("Index", item.index),
-                        yStart: .value("Min", priceRange.min),
-                        yEnd: .value("Price", item.price)
+                        y: .value("Price", item.price)
                     )
                     .foregroundStyle(
                         LinearGradient(
-                            gradient: Gradient(colors: [color.opacity(0.5), color.opacity(0.0)]),
+                            gradient: Gradient(colors: [color.opacity(0.35), color.opacity(0.0)]),
                             startPoint: .top,
                             endPoint: .bottom
                         )
@@ -502,7 +502,7 @@ private struct RealtimeSparkline: View {
             .chartYAxis(.hidden)
             .chartYScale(domain: priceRange.min...priceRange.max)
             .chartXScale(domain: 0...39)
-            // 不加 animation，避免 Y 軸 domain 變動時產生「從下浮上」的補間動畫
+            .transaction { $0.animation = nil } // 完全停止任何 Chart 內部的補間動畫
         }
     }
 }
