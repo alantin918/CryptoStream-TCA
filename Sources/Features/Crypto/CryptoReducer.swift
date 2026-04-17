@@ -7,6 +7,22 @@ import SwiftUI
 import Foundation
 
 public struct CryptoReducer: Reducer, Sendable {
+    public enum Timeframe: String, CaseIterable, Equatable, Sendable {
+        case h1 = "1h"
+        case d1 = "1d"
+        case w1 = "1w"
+        case M1 = "1M"
+        
+        public var displayName: String {
+            switch self {
+            case .h1: return "1H"
+            case .d1: return "1D"
+            case .w1: return "1W"
+            case .M1: return "1M"
+            }
+        }
+    }
+    
     public struct CoinState: Equatable, Identifiable {
         public let id: String // Symbol
         public var currentPrice: Double?
@@ -16,6 +32,11 @@ public struct CryptoReducer: Reducer, Sendable {
         public var lastUpdate: Date = .distantPast
         public var klineHistory: [KlineTick] = [] // Keeps the last X candles
         public var sparklineBuffer: [Double] = [] // Keeps high-frequency ticks for smooth jitter
+        
+        // MA Chart properties
+        public var selectedTimeframe: Timeframe = .h1
+        public var historicalPrices: [Double] = []
+        public var isFetchingHistory: Bool = false
         
         public var symbolDisplayName: String {
             id.replacingOccurrences(of: "usdt", with: "").uppercased()
@@ -39,6 +60,9 @@ public struct CryptoReducer: Reducer, Sendable {
         case onDisappear
         case receiveKline(KlineTick)
         case updateStatus(ConnectivityStatus)
+        // Detail View MA Chart
+        case selectTimeframe(coinId: String, timeframe: Timeframe)
+        case receiveHistoricalData(coinId: String, prices: [Double])
     }
     
     public enum ConnectivityStatus: String, Equatable {
@@ -149,6 +173,11 @@ public struct CryptoReducer: Reducer, Sendable {
                 coin.sparklineBuffer.removeFirst()
             }
             
+            // Keep the last point of the historical MA chart updated with the absolute latest real-time price
+            if !coin.historicalPrices.isEmpty {
+                coin.historicalPrices[coin.historicalPrices.count - 1] = tick.close
+            }
+            
             // Color is based on the candle's open and close
             coin.priceColor = tick.close >= tick.open ? .green : .red
             
@@ -157,6 +186,47 @@ public struct CryptoReducer: Reducer, Sendable {
             
         case let .updateStatus(status):
             state.connectivityStatus = status
+            return .none
+            
+        case let .selectTimeframe(coinId, timeframe):
+            guard var coin = state.coins[id: coinId] else { return .none }
+            coin.selectedTimeframe = timeframe
+            coin.isFetchingHistory = true
+            state.coins[id: coinId] = coin
+            
+            return .run { send in
+                // https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=100
+                let urlString = "https://api.binance.com/api/v3/klines?symbol=\(coinId.uppercased())&interval=\(timeframe.rawValue)&limit=100"
+                guard let url = URL(string: urlString) else { return }
+                
+                do {
+                    let (data, _) = try await URLSession.shared.data(from: url)
+                    // The response is an array of arrays. We need the close price at index 4.
+                    let decoded = try JSONSerialization.jsonObject(with: data, options: []) as? [[Any]]
+                    var prices: [Double] = []
+                    
+                    if let klines = decoded {
+                        for kline in klines {
+                            if kline.count > 4, let closeStr = kline[4] as? String, let closePrice = Double(closeStr) {
+                                prices.append(closePrice)
+                            }
+                        }
+                    }
+                    
+                    await send(.receiveHistoricalData(coinId: coinId, prices: prices))
+                } catch {
+                    // Fail silently or handle error? Just stop loading.
+                    await send(.receiveHistoricalData(coinId: coinId, prices: []))
+                }
+            }
+            
+        case let .receiveHistoricalData(coinId, prices):
+            guard var coin = state.coins[id: coinId] else { return .none }
+            coin.isFetchingHistory = false
+            if !prices.isEmpty {
+                coin.historicalPrices = prices
+            }
+            state.coins[id: coinId] = coin
             return .none
         }
     }

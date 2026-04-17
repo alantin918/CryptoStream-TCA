@@ -63,7 +63,7 @@ public struct CryptoView: View {
                 .navigationDestination(for: String.self) { coinId in
                     WithViewStore(self.store, observe: { $0.coins[id: coinId] }) { coinViewStore in
                         if let coin = coinViewStore.state {
-                            CoinDetailView(coin: coin)
+                            CoinDetailView(coin: coin, send: { coinViewStore.send($0) })
                         } else {
                             Text("Coin not found").foregroundColor(.white)
                         }
@@ -278,6 +278,7 @@ private struct HeaderStatusIndicator: View {
 
 private struct CoinDetailView: View {
     let coin: CryptoReducer.CoinState
+    let send: (CryptoReducer.Action) -> Void
     
     var body: some View {
         ZStack {
@@ -338,25 +339,55 @@ private struct CoinDetailView: View {
                         .padding(.horizontal, 24)
                     }
                     
-                    // Professional Trend Line
+                    // Professional Trend Line & Timeframe Selection
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("1H PRICE TREND")
-                            .font(.system(size: 14, weight: .bold, design: .monospaced))
-                            .foregroundColor(.white.opacity(0.6))
-                            .padding(.horizontal, 24)
+                        HStack {
+                            Text("MARKET TREND")
+                                .font(.system(size: 14, weight: .bold, design: .monospaced))
+                                .foregroundColor(.white.opacity(0.6))
+                            
+                            Spacer()
+                            
+                            // Timeframe Picker
+                            HStack(spacing: 8) {
+                                ForEach(CryptoReducer.Timeframe.allCases, id: \.self) { tf in
+                                    Button(action: {
+                                        send(.selectTimeframe(coinId: coin.id, timeframe: tf))
+                                    }) {
+                                        Text(tf.displayName)
+                                            .font(.system(size: 12, weight: .bold))
+                                            .foregroundColor(coin.selectedTimeframe == tf ? .white : .white.opacity(0.4))
+                                            .padding(.horizontal, 10)
+                                            .padding(.vertical, 4)
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 8)
+                                                    .fill(coin.selectedTimeframe == tf ? Color.white.opacity(0.2) : Color.clear)
+                                            )
+                                    }
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 24)
                         
-                        RealtimeSparkline(history: coin.sparklineBuffer, color: coin.priceColor)
-                            .frame(height: 250)
-                            .padding()
-                            .background(Color.white.opacity(0.02))
-                            .cornerRadius(16)
-                            .padding(.horizontal, 16)
+                        // Main MA Chart
+                        HistoricalMAChart(
+                            prices: coin.historicalPrices,
+                            isFetching: coin.isFetchingHistory,
+                            priceColor: coin.priceColor
+                        )
+                        .frame(height: 280)
+                        .padding(.horizontal, 16)
                     }
                 }
                 .padding(.bottom, 50)
             }
         }
         .navigationTitle(coin.symbolDisplayName)
+        .onAppear {
+            if coin.historicalPrices.isEmpty {
+                send(.selectTimeframe(coinId: coin.id, timeframe: coin.selectedTimeframe))
+            }
+        }
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
@@ -456,6 +487,148 @@ private struct RealtimeSparkline: View {
                     with: .color(color),
                     style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round)
                 )
+            }
+        }
+    }
+}
+
+// MARK: - Historical MA Chart
+
+private struct HistoricalMAChart: View {
+    let prices: [Double]
+    let isFetching: Bool
+    let priceColor: Color
+    
+    let ma7Color = Color(red: 0.95, green: 0.73, blue: 0.18) // Binance Yellow
+    let ma25Color = Color(red: 0.88, green: 0.35, blue: 0.97) // Pink/Purple
+    let ma99Color = Color(red: 0.31, green: 0.78, blue: 0.47) // Teal
+    
+    // Simple Moving Average
+    private func calculateMA(period: Int, data: [Double]) -> [Double?] {
+        guard period > 0, data.count > 0 else { return [] }
+        var result: [Double?] = []
+        for i in 0..<data.count {
+            if i < period - 1 {
+                result.append(nil)
+            } else {
+                let sum = data[(i - period + 1)...i].reduce(0, +)
+                result.append(sum / Double(period))
+            }
+        }
+        return result
+    }
+    
+    private func legendItem(title: String, value: Double?, color: Color) -> some View {
+        HStack(spacing: 4) {
+            Circle().fill(color).frame(width: 6, height: 6)
+            Text(title)
+                .font(.system(size: 10, weight: .bold))
+                .foregroundColor(.white.opacity(0.6))
+            if let val = value {
+                Text(String(format: "%.2f", val))
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundColor(color)
+            } else {
+                Text("--")
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundColor(color)
+            }
+        }
+    }
+
+    var body: some View {
+        let ma7 = calculateMA(period: 7, data: prices)
+        let ma25 = calculateMA(period: 25, data: prices)
+        let ma99 = calculateMA(period: 99, data: prices)
+        
+        let currMA7 = ma7.last ?? nil
+        let currMA25 = ma25.last ?? nil
+        let currMA99 = ma99.last ?? nil
+
+        VStack(spacing: 8) {
+            // Legend
+            HStack(spacing: 12) {
+                legendItem(title: "MA(7)", value: currMA7, color: ma7Color)
+                legendItem(title: "MA(25)", value: currMA25, color: ma25Color)
+                legendItem(title: "MA(99)", value: currMA99, color: ma99Color)
+                Spacer()
+            }
+            .padding(.horizontal, 8)
+            .frame(height: 20)
+
+            // Chart
+            ZStack {
+                Color.white.opacity(0.02)
+                    .cornerRadius(16)
+                
+                if isFetching && prices.isEmpty {
+                    ProgressView()
+                        .tint(.white)
+                } else if prices.isEmpty {
+                    Text("No Data")
+                        .foregroundColor(.white.opacity(0.4))
+                } else {
+                    Canvas { context, size in
+                        let allPoints = prices + ma7.compactMap{$0} + ma25.compactMap{$0} + ma99.compactMap{$0}
+                        guard let minVal = allPoints.min(), let maxVal = allPoints.max() else { return }
+                        
+                        let delta = maxVal - minVal
+                        let minDelta = max(delta, (maxVal + minVal) / 2 * 0.002)
+                        let padding = minDelta * 0.1
+                        let low  = ((maxVal + minVal) / 2) - (minDelta / 2) - padding
+                        let high = ((maxVal + minVal) / 2) + (minDelta / 2) + padding
+                        let range = high - low
+                        
+                        let xStep = size.width / CGFloat(max(1, prices.count - 1))
+                        
+                        func xPos(_ i: Int) -> CGFloat { CGFloat(i) * xStep }
+                        func yPos(_ v: Double) -> CGFloat {
+                            size.height - CGFloat((v - low) / range) * size.height
+                        }
+                        
+                        func drawPath(data: [Double?], color: Color, lineWidth: CGFloat = 1.0) {
+                            var path = Path()
+                            var isFirst = true
+                            for (i, val) in data.enumerated() {
+                                if let v = val {
+                                    let pt = CGPoint(x: xPos(i), y: yPos(v))
+                                    if isFirst {
+                                        path.move(to: pt)
+                                        isFirst = false
+                                    } else {
+                                        path.addLine(to: pt)
+                                    }
+                                }
+                            }
+                            context.stroke(path, with: .color(color), style: StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round))
+                        }
+                        
+                        // Fill Area for Price
+                        var areaPath = Path()
+                        areaPath.move(to: CGPoint(x: xPos(0), y: size.height))
+                        for (i, p) in prices.enumerated() {
+                            areaPath.addLine(to: CGPoint(x: xPos(i), y: yPos(p)))
+                        }
+                        areaPath.addLine(to: CGPoint(x: xPos(prices.count - 1), y: size.height))
+                        areaPath.closeSubpath()
+                        context.fill(
+                            areaPath,
+                            with: .linearGradient(
+                                Gradient(colors: [priceColor.opacity(0.3), priceColor.opacity(0.0)]),
+                                startPoint: CGPoint(x: 0, y: 0),
+                                endPoint: CGPoint(x: 0, y: size.height)
+                            )
+                        )
+                        
+                        // Draw lines
+                        drawPath(data: prices.map { $0 }, color: priceColor, lineWidth: 2)
+                        drawPath(data: ma99, color: ma99Color)
+                        drawPath(data: ma25, color: ma25Color)
+                        drawPath(data: ma7, color: ma7Color)
+                        
+                    }
+                    .padding()
+                }
             }
         }
     }
