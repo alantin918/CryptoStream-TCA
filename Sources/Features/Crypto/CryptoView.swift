@@ -501,8 +501,8 @@ private struct RealtimeSparkline: View {
             .chartXAxis(.hidden)
             .chartYAxis(.hidden)
             .chartYScale(domain: priceRange.min...priceRange.max)
-            .chartXScale(domain: 0...39) // Fixed domain to create left-to-right growth effect
-            .animation(.easeInOut(duration: 0.1), value: history.last ?? 0)
+            .chartXScale(domain: 0...39)
+            // 不加 animation，避免 Y 軸 domain 變動時產生「從下浮上」的補間動畫
         }
     }
 }
