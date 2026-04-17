@@ -14,44 +14,58 @@ public struct CryptoView: View {
     
     public var body: some View {
         WithViewStore(self.store, observe: { $0 }) { viewStore in
-            ZStack {
-                // 1. Sleek Dark Gradient Background
-                LinearGradient(
-                    gradient: Gradient(colors: [Color(red: 0.05, green: 0.05, blue: 0.1), Color.black]),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .ignoresSafeArea()
-                
-                // Animated ambient light blobs for "Premium" look
+            NavigationStack {
                 ZStack {
-                    Circle()
-                        .fill(Color.blue.opacity(0.15))
-                        .frame(width: 300, height: 300)
-                        .blur(radius: 100)
-                        .offset(x: -150, y: -200)
+                    // 1. Sleek Dark Gradient Background
+                    LinearGradient(
+                        gradient: Gradient(colors: [Color(red: 0.05, green: 0.05, blue: 0.1), Color.black]),
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .ignoresSafeArea()
                     
-                    Circle()
-                        .fill(Color.purple.opacity(0.15))
-                        .frame(width: 300, height: 300)
-                        .blur(radius: 100)
-                        .offset(x: 150, y: 200)
-                }
-                
-                VStack(spacing: 0) {
-                    // Header Area
-                    HeaderView(status: viewStore.connectivityStatus)
+                    // Animated ambient light blobs for "Premium" look
+                    ZStack {
+                        Circle()
+                            .fill(Color.blue.opacity(0.15))
+                            .frame(width: 300, height: 300)
+                            .blur(radius: 100)
+                            .offset(x: -150, y: -200)
+                        
+                        Circle()
+                            .fill(Color.purple.opacity(0.15))
+                            .frame(width: 300, height: 300)
+                            .blur(radius: 100)
+                            .offset(x: 150, y: 200)
+                    }
                     
-                    ScrollView(showsIndicators: false) {
-                        LazyVStack(spacing: 20) {
-                            ForEach(viewStore.coins) { coin in
-                                CoinCardView(coin: coin)
+                    VStack(spacing: 0) {
+                        // Header Area
+                        HeaderView(status: viewStore.connectivityStatus)
+                        
+                        ScrollView(showsIndicators: false) {
+                            LazyVStack(spacing: 20) {
+                                ForEach(viewStore.coins) { coin in
+                                    NavigationLink(value: coin.id) {
+                                        CoinCardView(coin: coin)
+                                    }
+                                    .buttonStyle(.plain)
                                     .transition(.move(edge: .bottom).combined(with: .opacity))
+                                }
                             }
+                            .padding(.horizontal, 20)
+                            .padding(.top, 10)
+                            .padding(.bottom, 30)
                         }
-                        .padding(.horizontal, 20)
-                        .padding(.top, 10)
-                        .padding(.bottom, 30)
+                    }
+                }
+                .navigationDestination(for: String.self) { coinId in
+                    WithViewStore(self.store, observe: { $0.coins[id: coinId] }) { coinViewStore in
+                        if let coin = coinViewStore.state {
+                            CoinDetailView(coin: coin)
+                        } else {
+                            Text("Coin not found").foregroundColor(.white)
+                        }
                     }
                 }
             }
@@ -158,8 +172,8 @@ private struct CoinCardView: View {
                 
                 Spacer()
                 
-                // Candlesitck Chart (using SwiftUI Charts)
-                CandlestickChart(history: coin.klineHistory)
+                // Sparkline Chart for list view
+                RealtimeSparkline(history: coin.klineHistory.map(\.close), color: coin.priceColor)
                     .frame(width: 100, height: 35)
             }
         }
@@ -336,3 +350,187 @@ private struct HeaderStatusIndicator: View {
     }
 }
 
+// MARK: - Coin Detail View (Navigation Push)
+
+private struct CoinDetailView: View {
+    let coin: CryptoReducer.CoinState
+    @State private var isPulsing = false
+    
+    var body: some View {
+        ZStack {
+            // Background
+            LinearGradient(
+                gradient: Gradient(colors: [Color.black, Color(red: 0.05, green: 0.05, blue: 0.1)]),
+                startPoint: .top,
+                endPoint: .bottom
+            ).ignoresSafeArea()
+            
+            ScrollView {
+                VStack(spacing: 30) {
+                    // Header Status
+                    HStack {
+                        SymbolIcon(symbol: coin.id)
+                            .scaleEffect(1.5)
+                            .padding(.trailing, 10)
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(coin.symbolDisplayName)
+                                .font(.system(size: 32, weight: .black, design: .rounded))
+                                .foregroundColor(.white)
+                            Text(coin.id.uppercased())
+                                .font(.system(size: 16, weight: .bold, design: .monospaced))
+                                .foregroundColor(.white.opacity(0.5))
+                        }
+                        Spacer()
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.top, 20)
+                    
+                    // Current Price
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("LAST PRICE")
+                            .font(.system(size: 12, weight: .bold, design: .monospaced))
+                            .foregroundColor(.white.opacity(0.5))
+                        
+                        HStack {
+                            Text(String(format: "$%.2f", coin.currentPrice ?? 0))
+                                .font(.system(size: 50, weight: .black, design: .rounded))
+                                .foregroundColor(.white)
+                                .shadow(color: coin.priceColor.opacity(isPulsing ? 1.0 : 0.0), radius: 15)
+                                .animation(.spring(response: 0.2, dampingFraction: 0.6), value: coin.currentPrice)
+                            Spacer()
+                        }
+                    }
+                    .padding(.horizontal, 24)
+                    
+                    // OHLC Stats of Current Candle
+                    if let currentCandle = coin.klineHistory.last {
+                        HStack {
+                            StatBox(title: "OPEN", value: currentCandle.open)
+                            StatBox(title: "HIGH", value: currentCandle.high)
+                            StatBox(title: "LOW", value: currentCandle.low)
+                            StatBox(title: "CLOSE", value: currentCandle.close)
+                        }
+                        .padding(.horizontal, 24)
+                    }
+                    
+                    // Professional Candlestick Chart
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("1M CANDLESTICK")
+                            .font(.system(size: 14, weight: .bold, design: .monospaced))
+                            .foregroundColor(.white.opacity(0.6))
+                            .padding(.horizontal, 24)
+                        
+                        CandlestickChart(history: coin.klineHistory)
+                            .frame(height: 250)
+                            .padding()
+                            .background(Color.white.opacity(0.02))
+                            .cornerRadius(16)
+                            .padding(.horizontal, 16)
+                    }
+                    
+                    // Trend Line (Sparkline)
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("SMOOTH TREND")
+                            .font(.system(size: 14, weight: .bold, design: .monospaced))
+                            .foregroundColor(.white.opacity(0.6))
+                            .padding(.horizontal, 24)
+                        
+                        RealtimeSparkline(history: coin.klineHistory.map(\.close), color: coin.priceColor)
+                            .frame(height: 120)
+                            .padding()
+                            .background(Color.white.opacity(0.02))
+                            .cornerRadius(16)
+                            .padding(.horizontal, 16)
+                    }
+                }
+                .padding(.bottom, 50)
+            }
+        }
+        .navigationTitle(coin.symbolDisplayName)
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+        .onChange(of: coin.currentPrice) { _ in
+            withAnimation(.easeOut(duration: 0.1)) {
+                isPulsing = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                withAnimation(.easeIn(duration: 0.3)) {
+                    isPulsing = false
+                }
+            }
+        }
+    }
+}
+
+private struct StatBox: View {
+    let title: String
+    let value: Double
+    var body: some View {
+        VStack(spacing: 4) {
+            Text(title)
+                .font(.system(size: 10, weight: .bold))
+                .foregroundColor(.white.opacity(0.4))
+            Text(String(format: "%.2f", value))
+                .font(.system(size: 12, weight: .black, design: .monospaced))
+                .foregroundColor(.white.opacity(0.8))
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+        .background(Color.white.opacity(0.05))
+        .cornerRadius(8)
+    }
+}
+
+// MARK: - Restore RealtimeSparkline
+private struct RealtimeSparkline: View {
+    let history: [Double]
+    let color: Color
+    
+    private var priceRange: (min: Double, max: Double) {
+        let min = history.min() ?? 0
+        let max = history.max() ?? 0
+        if min == max { return (min: min * 0.9999, max: max * 1.0001) }
+        let delta = max - min
+        return (min: min - (delta * 0.05), max: max + (delta * 0.05))
+    }
+    
+    var body: some View {
+        if history.isEmpty {
+            Rectangle()
+                .fill(Color.white.opacity(0.05))
+        } else {
+            Chart {
+                ForEach(Array(history.enumerated()), id: \.offset) { index, price in
+                    LineMark(
+                        x: .value("Index", index),
+                        y: .value("Price", price)
+                    )
+                    .foregroundStyle(color)
+                    .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+                    
+                    AreaMark(
+                        x: .value("Index", index),
+                        yStart: .value("Min", priceRange.min),
+                        yEnd: .value("Price", price)
+                    )
+                    .foregroundStyle(
+                        LinearGradient(
+                            gradient: Gradient(colors: [color.opacity(0.5), color.opacity(0.0)]),
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                }
+            }
+            .chartXAxis(.hidden)
+            .chartYAxis(.hidden)
+            .chartYScale(domain: priceRange.min...priceRange.max)
+            .chartXScale(domain: .automatic(includesZero: false))
+            .animation(.easeInOut(duration: 0.1), value: history.last ?? 0)
+        }
+    }
+}

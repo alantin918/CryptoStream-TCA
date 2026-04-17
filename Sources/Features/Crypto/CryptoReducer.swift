@@ -136,8 +136,8 @@ public struct CryptoReducer: Reducer, Sendable {
             } else {
                 // A new minute has started, append the new candle
                 coin.klineHistory.append(tick)
-                // Limit the number of candles displayed to fit the UI smoothly (e.g., last 20 mins)
-                if coin.klineHistory.count > 20 {
+                // Limit the number of candles displayed to fit the UI smoothly (e.g., last 60 mins)
+                if coin.klineHistory.count > 60 {
                     coin.klineHistory.removeFirst()
                 }
             }
